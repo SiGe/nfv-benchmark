@@ -42,5 +42,8 @@
 #define BUFFER_SIZE 1024
 #endif
 
+#ifndef MEASUREMENT_BUFFER_SIZE
+#define MEASUREMENT_BUFFER_SIZE 32
+#endif
 
 #endif //_DEFAULTS_H_

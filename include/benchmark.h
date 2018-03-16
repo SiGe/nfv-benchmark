@@ -4,9 +4,10 @@
 #include "defaults.h"
 
 #include "buffered_element.h"
-#include "elements/identity.h"
-#include "elements/drop.h"
 #include "elements/checksum.h"
+#include "elements/drop.h"
+#include "elements/identity.h"
+#include "elements/measurement.h"
 #include "elements/routing.h"
 #include "pipeline.h"
 
@@ -47,6 +48,15 @@ static struct element_t *el_routing_create_with_file(
 
     return (struct element_t *)buffered_element_create(
             (struct element_t*)router, size);
+}
+
+static struct element_t *el_measurement_create_with_size(
+        packet_index_t size, size_t tbl_size) {
+    struct measurement_t *monitor = measurement_create();
+    measurement_resize(monitor, tbl_size);
+
+    return (struct element_t *)buffered_element_create(
+            (struct element_t*)monitor, size);
 }
 
 void benchmark_config_init(struct benchmark_t *);

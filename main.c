@@ -10,11 +10,6 @@
 
 #include "benchmark.h"
 #include "pipeline.h"
-#include "buffered_element.h"
-#include "elements/checksum.h"
-#include "elements/drop.h"
-#include "elements/identity.h"
-#include "elements/routing.h"
 
 void test_benchmark() {
     struct benchmark_t bench;

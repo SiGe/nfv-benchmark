@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "packets.h"
 #include "rte_prefetch.h"
+#include "types.h"
 
 #include "elements/routing.h"
 
@@ -199,7 +200,7 @@ void routing_process(struct element_t *el, struct packet_t **pkts, packet_index_
     }
 
     for (packet_index_t i = 0; i < count; ++i) {
-        struct _routing_tbl_entry_t *ent = routing_entry_find(self, *((ipv4_t*)(pkts[i]->hdr+32)));
+        struct _routing_tbl_entry_t *ent = routing_entry_find(self, *((ipv4_t*)(pkts[i]->hdr+ 14 + 12 + 4)));
         if (ent) {
             port_count += ent->port;
             ent->count ++;

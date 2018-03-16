@@ -2,6 +2,7 @@
 #define _ELEMENTS_ROUTING_H_
 
 #include "element.h"
+#include "types.h"
 
 // Simple IP routing using a trie.  The implementation is similar to RadixTrie
 // in Click - the first level has 256 buckets, the levels after have 16 each.
@@ -38,14 +39,6 @@ struct routing_t {
 
     struct _routing_tbl_256_t fst_tbl;
 };
-
-typedef uint32_t ipv4_t;
-typedef uint32_t maskv4_t;
-
-typedef struct {
-    ipv4_t ipv4;
-    maskv4_t mask;
-} ipv4_prefix_t;
 
 struct routing_t *routing_create();
 void routing_process(struct element_t *, struct packet_t **, packet_index_t);
