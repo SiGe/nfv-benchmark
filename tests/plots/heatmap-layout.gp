@@ -41,9 +41,13 @@ set ytics 0,1
 
 log2(x) = log(x) / log(2)
 
+rangeDown="100 140 200 360"
+rangeUp="260 300 400 600"
+
 do for [i=1:words(files)] {
     set title 'Latency \@'.word(files, i).'B'  offset 0,-1
     set ylabel offset -1.5,0
+    set cbrange [word(rangeDown, i):word(rangeUp, i)]
     plot '<../plots/output-to-mat.sh '.'output/'.word(files, i).'.tsv' matrix using 1:2:3 with image title ''
 } 
 
