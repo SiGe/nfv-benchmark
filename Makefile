@@ -4,7 +4,7 @@ CC = gcc
 PROFILE=optimized
 
 # CFlag rules
-CFLAGS_BASE = -I include/ -I lib/
+CFLAGS_BASE = -I include/ -I lib/ -lm
 CFLAGS_OPT = $(CFLAGS_BASE) -O3 -ffunction-sections -fdata-sections -fPIC
 CFLAGS_DEBUG = $(CFLAGS_BASE) -O0 -pg -g -fPIC
 
@@ -77,8 +77,7 @@ no-profile: clean build
 
 .PHONY: clean
 clean:
-	@rm -f $(MAIN_OBJ)
-	@rm -f $(JIT_TEST_OBJ)
+	@find . -iname "*.o" -delete
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(EXTRA) $(CPPFLAGS) -c -o $@ $<
