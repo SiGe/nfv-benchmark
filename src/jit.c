@@ -12,9 +12,11 @@ void jit_test_load(struct jit_t *jit, char const *name) {
 
     // make the file
     log_info("Compiling the shared library.");
-    sprintf(buffer, "make jit-test BENCHMARK=%s PROFILE=optimized", name);
-    system(buffer);
-    jit->handle = dlopen("jit-test.so", RTLD_LAZY);
+    sprintf(buffer, "make jit-test BENCHMARK=%s PROFILE=optimized 2>./logs/jit.gcc.err 1>./logs/jit.gcc.out", name);
+    if (system(buffer) != 0) {
+        return;
+    }
+    jit->handle = dlopen("./jit-test.so", RTLD_LAZY);
 
     if (jit->handle == 0) {
         log_err(dlerror());

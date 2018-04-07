@@ -1,6 +1,3 @@
-#ifndef _BENCHMARK_HELPER_H_
-#define _BENCHMARK_HELPER_H_
-
 #include "defaults.h"
 
 #include "elements/buffered_element.h"
@@ -9,6 +6,8 @@
 #include "elements/identity.h"
 #include "elements/measurement.h"
 #include "elements/routing.h"
+
+#include "benchmark_helper.h"
 
 inline struct element_t *el_identity_create(packet_index_t size) {
     return (struct element_t *)buffered_element_create(
@@ -52,4 +51,3 @@ inline struct element_t *el_measurement_create_with_size(
             (struct element_t*)monitor, size);
 }
 
-#endif // _BENCHMARK_HELPER_H_

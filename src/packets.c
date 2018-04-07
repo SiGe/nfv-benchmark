@@ -42,8 +42,6 @@ inline packet_t *packets_pool_reset(packet_pool_t *pool) {
 
 packet_pool_t* packets_pool_create(uint32_t count, uint32_t size) {
     size_t ds_size = ALIGN(sizeof(packet_t) + size, 6);
-    //size_t ds_size = sizeof(packet_t) + size;
-    printf("SIZE OF PACKETS: %lu\n", ds_size);
     size_t pool_size = ds_size * count;
     void *mem = mem_alloc_align(CACHE_LINE_SIZE, pool_size);
     packet_pool_t *pool = mem_alloc_align(CACHE_LINE_SIZE, sizeof(packet_pool_t));

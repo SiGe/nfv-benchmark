@@ -15,7 +15,7 @@
 
 void test_benchmark(char const *name) {
     uint32_t packet_count = 1<<20;
-    struct packet_pool_t *pool = packets_pool_create(1<<20, PACKET_SIZE);
+    struct packet_pool_t *pool = packets_pool_create(packet_count, PACKET_SIZE);
 
     // Compile and load the checksum-drop module
     struct jit_t jit = {0};
@@ -23,7 +23,7 @@ void test_benchmark(char const *name) {
 
     // Benchmark the running time of the jitted test
     // Put a memory barrier for benchmarks
-    uint32_t repeat = 100;
+    uint32_t repeat = 200;
     asm volatile ("mfence" ::: "memory");
     uint64_t cycles = rte_get_tsc_cycles();
     (*jit.entry.test)(pool, repeat);

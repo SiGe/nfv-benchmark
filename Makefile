@@ -77,7 +77,6 @@ no-profile: clean build
 
 .PHONY: clean
 clean:
-	#@rm -f $(OBJ) $(TARGET)
 	@rm -f $(MAIN_OBJ)
 	@rm -f $(JIT_TEST_OBJ)
 
@@ -96,7 +95,7 @@ profile: clean build
 .PHONY: profile-run
 profile-run: clean build
 	@echo flags,$(PROFILE),$(EXTRA)$
-	./$(TARGET)
+	@./$(TARGET)
 
 .PHONY: jit-test-build
 jit-test-build: $(JIT_TEST_OBJ)

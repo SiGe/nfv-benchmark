@@ -1,6 +1,8 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
+#include <stdint.h>
+
 typedef uint32_t ipv4_t;
 typedef uint32_t maskv4_t;
 
