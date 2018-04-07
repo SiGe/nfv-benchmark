@@ -1,6 +1,6 @@
 #include "element.h"
 #include "packets.h"
-#include "buffered_element.h"
+#include "elements/buffered_element.h"
 
 struct buffered_element_t *buffered_element_create(
         struct element_t *element,
@@ -75,5 +75,5 @@ void buffered_element_disconnect(element_t *self, port_index_t port) {
 
 element_t *buffered_element_hop_at(element_t *self, port_index_t port) {
     struct buffered_element_t *ele = (struct buffered_element_t *)self;
-    ele->element->hop_at(ele->element, port);
+    return ele->element->hop_at(ele->element, port);
 }

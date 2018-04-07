@@ -3,47 +3,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "benchmark.h"
+#include "jit.h"
+#include "log.h"
 #include "packets.h"
+#include "pipeline.h"
 
 #include "rte_cycles.h"
 #include "rte_prefetch.h"
 
-#include "benchmark.h"
-#include "pipeline.h"
 
-void test_benchmark() {
-    struct benchmark_t bench;
-    benchmark_config_init(&bench);
+void test_benchmark(char const *name) {
+    uint32_t packet_count = 1<<20;
+    struct packet_pool_t *pool = packets_pool_create(1<<20, PACKET_SIZE);
 
-    struct packet_pool_t *pool = bench.pool;
-    struct pipeline_t *pipe = bench.pipeline;
+    // Compile and load the checksum-drop module
+    struct jit_t jit = {0};
+    jit_test_load(&jit, name);
 
-    packet_index_t batch_size = 0;
-    packet_t *pkts[32] = {0};
-    uint64_t count = 0;
-    
+    // Benchmark the running time of the jitted test
     // Put a memory barrier for benchmarks
+    uint32_t repeat = 100;
     asm volatile ("mfence" ::: "memory");
     uint64_t cycles = rte_get_tsc_cycles();
-
-    for (uint32_t i = 0; i < bench.repeat; ++i) {
-        while (batch_size = packets_pool_next_batch(pool, pkts, 32)) {
-            pipeline_process(pipe, pkts, batch_size);
-            count+= batch_size;
-        }
-        packets_pool_reset(pool);
-    }
-
+    (*jit.entry.test)(pool, repeat);
     asm volatile ("mfence" ::: "memory");
-    printf("num cycles per packet (%.2f)\n", (float)(rte_get_tsc_cycles() - cycles)/(float)(count));
+    printf("num cycles per packet (%.2f)\n", (float)(rte_get_tsc_cycles() - cycles)/(float)(packet_count * repeat));
+
+    // Unload once done
+    jit_test_unload(&jit);
     packets_pool_delete(&pool);
-    pipeline_release(pipe);
 }
 
 int main() {
     // Deterministic experiments are the best experiments - one can only hope.
     srand(0);
-
-    test_benchmark();
+    test_benchmark("checksum-checksum");
     return 0;
 }

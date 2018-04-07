@@ -46,7 +46,7 @@ void pipeline_element_remove(
         prev = pipeline->elements[idx];
     }
 
-    for (idx; idx < pipeline->size; ++idx) {
+    for (;idx < pipeline->size; ++idx) {
         pipeline->elements[idx] = pipeline->elements[idx+1];
     }
 }

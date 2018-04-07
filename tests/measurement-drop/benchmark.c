@@ -1,4 +1,6 @@
+#include "benchmark/helper.h"
 #include "benchmark.h"
+#include "defaults.h"
 
 void benchmark_config_init(struct benchmark_t *bench) {
     struct pipeline_t *pipe = 0;

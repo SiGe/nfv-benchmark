@@ -28,6 +28,7 @@ typedef int packet_index_t;
 
 
 packet_pool_t*      packets_pool_create(uint32_t count, uint32_t size);
+packet_pool_t*      packets_pool_create_zipfian(uint32_t count, uint32_t size, double dist);
 void                packets_pool_delete(packet_pool_t **);
 packet_t*           packets_pool_next(packet_pool_t *);
 packet_index_t      packets_pool_next_batch(packet_pool_t *, packet_t **, packet_index_t);

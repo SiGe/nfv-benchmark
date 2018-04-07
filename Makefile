@@ -5,23 +5,39 @@ PROFILE=optimized
 
 # CFlag rules
 CFLAGS_BASE = -I include/ -I lib/
-CFLAGS_OPT = $(CFLAGS_BASE) -O3
-CFLAGS_DEBUG = $(CFLAGS_BASE) -O0 -pg -g
+CFLAGS_OPT = $(CFLAGS_BASE) -O3 -ffunction-sections -fdata-sections -fPIC
+CFLAGS_DEBUG = $(CFLAGS_BASE) -O0 -pg -g -fPIC
+
+# Linker flags
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	LDFLAGS += -Wl,--gc-sections
+endif
+ifeq ($(UNAME_S),Darwin)
+	#LDFLAGS += -Wl,-dead_strip
+endif
 
 TARGET = main
 
 # Build the source tree
 SRC  = $(wildcard src/*.c)
 SRC += $(wildcard lib/*.c)
-SRC += $(wildcard src/elements/*.c)
-SRC += main.c
 
-ifeq ($(MAKECMDGOALS), profile-run)
-	SRC += tests/$(BENCHMARK)/benchmark.c
+JIT_TEST_SRC = $(SRC)
+JIT_TEST_SRC += $(wildcard src/elements/*.c)
+JIT_TEST_SRC += jit_test.c
+
+MAIN_SRC = $(SRC)
+MAIN_SRC += main.c
+
+ifeq ($(MAKECMDGOALS), jit-test)
+	TARGET = jit-test
+	JIT_TEST_SRC += tests/$(BENCHMARK)/benchmark.c
 endif
 
 # Object file rules
-OBJ  = $(SRC:.c=.o)
+MAIN_OBJ = $(MAIN_SRC:.c=.o)
+JIT_TEST_OBJ = $(JIT_TEST_SRC:.c=.o)
 
 # List of perf events
 EVENTS=cycles
@@ -61,14 +77,16 @@ no-profile: clean build
 
 .PHONY: clean
 clean:
-	@rm -f $(OBJ) $(TARGET)
+	#@rm -f $(OBJ) $(TARGET)
+	@rm -f $(MAIN_OBJ)
+	@rm -f $(JIT_TEST_OBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(EXTRA) $(CPPFLAGS) -c -o $@ $<
 
 .PHONY: build
-build: $(OBJ)
-	$(CC) -o $(TARGET) $^ $(LDFLAGS) $(CFLAGS) $(EXTRA)
+build: $(MAIN_OBJ)
+	$(CC) -o $(TARGET) $^ $(LDFLAGS) $(CFLAGS) $(EXTRA) -ldl
 
 .PHONY: profile
 profile: clean build
@@ -79,3 +97,10 @@ profile: clean build
 profile-run: clean build
 	@echo flags,$(PROFILE),$(EXTRA)$
 	./$(TARGET)
+
+.PHONY: jit-test-build
+jit-test-build: $(JIT_TEST_OBJ)
+	$(CC) -shared -o $(TARGET).so $^ $(LDFLAGS) $(CFLAGS) $(EXTRA)
+
+.PHONY: jit-test
+jit-test: jit-test-build
