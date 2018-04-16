@@ -17,8 +17,11 @@
  */
 
 void test_benchmark(char const *name) {
-    uint32_t packet_count = 1<<20;
+    uint32_t packet_count = 1<<24;
     struct packet_pool_t *pool = packets_pool_create(packet_count, PACKET_SIZE);
+
+    // Create a zipfian distribution for source/destination ip address
+    packets_pool_zipfian(pool, 0, packet_count - 1, 26, 8, 0.5);
 
     // Compile and load the checksum-drop module
     struct jit_t jit = {0};
@@ -26,7 +29,7 @@ void test_benchmark(char const *name) {
 
     // Benchmark the running time of the jitted test
     // Put a memory barrier for benchmarks
-    uint32_t repeat = 200;
+    uint32_t repeat = 20;
     asm volatile ("mfence" ::: "memory");
     uint64_t cycles = rte_get_tsc_cycles();
     (*jit.entry.test)(pool, repeat);
@@ -41,6 +44,6 @@ void test_benchmark(char const *name) {
 int main() {
     // Deterministic experiments are the best experiments - one can only hope.
     srand(0);
-    test_benchmark("checksum-checksum");
+    test_benchmark("measurement-drop");
     return 0;
 }
