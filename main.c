@@ -12,6 +12,9 @@
 #include "rte_cycles.h"
 #include "rte_prefetch.h"
 
+/* TODO:
+ * Normal vs. DDOS distribution packet size distribution
+ */
 
 void test_benchmark(char const *name) {
     uint32_t packet_count = 1<<20;
