@@ -19,6 +19,6 @@ void pipeline_element_remove(struct pipeline_t* pipeline, struct element_t *ele)
 
 void pipeline_process(struct pipeline_t* pipeline, struct packet_t **pkts, packet_index_t size);
 void pipeline_release(struct pipeline_t* pipeline);
-struct pipeline_t *pipeline_create();
+struct pipeline_t *pipeline_create(void);
 
 #endif // _PIPELINE_H_

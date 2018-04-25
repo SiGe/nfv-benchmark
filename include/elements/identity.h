@@ -11,7 +11,7 @@ struct identity_t {
     uint64_t identity_count;
 };
 
-struct identity_t *identity_create();
+struct identity_t *identity_create(void);
 void identity_process(struct element_t *, struct packet_t **, packet_index_t);
 void identity_release(struct element_t *);
 void identity_report(struct element_t *);

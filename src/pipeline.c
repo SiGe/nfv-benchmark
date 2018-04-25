@@ -64,7 +64,7 @@ void pipeline_release(struct pipeline_t* pipeline) {
     }
 }
 
-struct pipeline_t *pipeline_create() {
+struct pipeline_t *pipeline_create(void) {
     return (struct pipeline_t *)mem_alloc(sizeof(struct pipeline_t));
 }
 

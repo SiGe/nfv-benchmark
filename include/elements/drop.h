@@ -11,7 +11,7 @@ struct drop_t {
     uint64_t drop_count;
 };
 
-struct drop_t *drop_create();
+struct drop_t *drop_create(void);
 void drop_process(struct element_t *, struct packet_t **, packet_index_t);
 void drop_release(struct element_t *);
 void drop_report(struct element_t *);

@@ -55,14 +55,17 @@ inline packet_t *packets_pool_reset(packet_pool_t *pool) {
 packet_pool_t* packets_pool_create(uint32_t count, uint32_t size) {
     size_t ds_size = ALIGN(sizeof(packet_t) + size, 6);
     size_t pool_size = ds_size * count;
-    void *mem = mem_alloc_align(CACHE_LINE_SIZE, pool_size);
+    char *mem = mem_alloc_align(CACHE_LINE_SIZE, pool_size);
     packet_pool_t *pool = mem_alloc_align(CACHE_LINE_SIZE, sizeof(packet_pool_t));
 
-    pool->packets = mem;
+    pool->packets = (packet_t*)mem;
     pool->count = count;
     pool->size = ds_size - (sizeof(packet_t));
-    pool->end = mem + pool_size;
-    pool->cur = mem;
+    pool->end = (void*)(mem + pool_size);
+    pool->cur = (packet_t*)mem;
+    pool->metadata = 0;
+    pool->pool_next_batch = packets_pool_next_batch;
+    pool->pool_reset = packets_pool_reset;
 
     for (packet_t *pkt = packets_pool_first(pool); 
             pkt < pool->end; pkt = (packet_t*)(pkt->data + pool->size)) {
@@ -83,8 +86,8 @@ packet_pool_t* packets_pool_create(uint32_t count, uint32_t size) {
 
 void packets_pool_zipfian(packet_pool_t *pool, uint32_t from, 
         uint32_t to, uint32_t offset, uint32_t bytes, double dist) {
-    assert(offset >= 0 && (offset + bytes < pool->size));
-    assert(from >= 0 && to < pool->count && from < to);
+    assert(offset + bytes < pool->size);
+    assert(to < pool->count && from < to);
     packet_t *end = packets_pool_at(pool, to-1);
     rand_val(2000);
 
@@ -99,11 +102,11 @@ void packets_pool_zipfian(packet_pool_t *pool, uint32_t from,
     // Fill the bytestream with random values
     char *bytestream = mem_alloc(bytes * num_values);
     int *iptr = (int *)bytestream;
-    for (int i = 0; i < bytes/(sizeof(int)); ++i) { // Eh, ignore the last byte
+    for (size_t i = 0; i < bytes/(sizeof(int)); ++i) { // Eh, ignore the last byte
         *iptr++ = rand();
     }
 
-    int count = 0;
+    uint32_t count = 0;
     for (struct packet_t *pkt = packets_pool_move(pool, from);
             pkt && (pkt != end); pkt = packets_pool_next(pool)) {
         int index = zipf(dist, n, 0);

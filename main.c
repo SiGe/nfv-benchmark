@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "rte_ethdev.h"
+
 #include "benchmark.h"
+#include "dataplane.h"
 #include "jit.h"
 #include "log.h"
 #include "packets.h"
@@ -15,6 +18,8 @@
 /* TODO:
  * Normal vs. DDOS distribution packet size distribution
  */
+
+void test_benchmark(char const *);
 
 void test_benchmark(char const *name) {
     uint32_t packet_count = 1<<24;
@@ -41,9 +46,43 @@ void test_benchmark(char const *name) {
     packets_pool_delete(&pool);
 }
 
-int main() {
+int datapath_init(int argc, char **argv, struct dataplane_port_t **port) {
+    *port = 0;
+    int ret = rte_eal_init(argc, argv);
+    if (ret < 0)
+        rte_exit(EXIT_FAILURE, "Failed to initialize the EAL.");
+
+    const char port_name[] = "0000:06:00.3";
+    log_info_fmt("Num available dpdk ports: %d", rte_eth_dev_count());
+
+    struct dataplane_port_t *pport = 0;
+    ret = port_configure(port_name, &pport);
+    if (ret < 0)
+        rte_exit(EXIT_FAILURE, "Failed to configure port %s", port_name);
+    log_info_fmt("Port [%s] configured successfully.", port_name);
+    *port = pport;
+    return ret;
+}
+
+void datapath_teardown(struct datapath_port_t *port) {
+    port_release(port);
+    rte_eal_cleanup();
+}
+
+int main(int argc, char **argv) {
     // Deterministic experiments are the best experiments - one can only hope.
     srand(0);
-    test_benchmark("measurement-drop");
+
+    struct datapath_port_t *port = 0;
+    int ret = datapath_init(argc, argv, &port);
+    argc -= ret;
+    argv += ret;
+
+    if (!port) 
+        return 0;
+
+    sleep(10);
+
+    datapath_teardown(port);
     return 0;
 }

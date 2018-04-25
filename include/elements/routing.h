@@ -40,7 +40,7 @@ struct routing_t {
     struct _routing_tbl_256_t fst_tbl;
 };
 
-struct routing_t *routing_create();
+struct routing_t *routing_create(void);
 void routing_process(struct element_t *, struct packet_t **, packet_index_t);
 void routing_release(struct element_t *);
 void routing_report(struct element_t *);

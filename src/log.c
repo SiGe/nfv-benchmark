@@ -11,6 +11,7 @@ inline void log_info(const char *msg) {
 #endif
 }
 
+
 inline void log_warn(const char *msg) {
 #if LOG_LEVEL > LOG_WARN
     char buffer[26] = {0};

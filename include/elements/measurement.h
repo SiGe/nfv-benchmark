@@ -13,7 +13,7 @@ struct measurement_t {
     uint32_t *tbl;
 };
 
-struct measurement_t *measurement_create();
+struct measurement_t *measurement_create(void);
 void measurement_resize(struct measurement_t *, size_t tbl_size);
 void measurement_process_no_prefetching(struct element_t *, struct packet_t **, packet_index_t);
 void measurement_process_prefetching(struct element_t *, struct packet_t **, packet_index_t);

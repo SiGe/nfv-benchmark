@@ -7,6 +7,7 @@
 
 #include "jit.h"
 
+// name is the name of the benchmark
 void jit_test_load(struct jit_t *jit, char const *name) {
     char buffer[256] = {0};
 

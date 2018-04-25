@@ -2,6 +2,7 @@
 # Custom
 #----------------------------------------
 main
+txer
 tests/**/*tsv
 tests/**/*png
 tests/**/*pdf

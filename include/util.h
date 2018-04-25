@@ -11,7 +11,7 @@
 
 #define ALIGN(size, to) ((size + ((1<<to) - 1)) & (-1 ^ ((1<<to) - 1)));
 
-static inline uint64_t rand64_t() {
+static inline uint64_t rand64_t(void) {
     return ((uint64_t)rand() << 32) | ((uint64_t)rand());
 }
 
