@@ -8,7 +8,7 @@
 
 static unsigned short checksum(const char *buf, unsigned size) {
 	unsigned long long sum = 0;
-	const unsigned long long *b = (unsigned long long *) buf;
+	const unsigned long long *b = (const unsigned long long *) buf;
 
 	unsigned t1, t2;
 	unsigned short t3, t4;
@@ -26,7 +26,7 @@ static unsigned short checksum(const char *buf, unsigned size) {
 	buf = (const char *) b;
 	if (size & 4)
 	{
-		unsigned s = *(unsigned *)buf;
+		unsigned s = *(const unsigned *)buf;
 		sum += s;
 		if (sum < s) sum++;
 		buf += 4;
@@ -34,7 +34,7 @@ static unsigned short checksum(const char *buf, unsigned size) {
 
 	if (size & 2)
 	{
-		unsigned short s = *(unsigned short *) buf;
+		unsigned short s = *(const unsigned short *) buf;
 		sum += s;
 		if (sum < s) sum++;
 		buf += 2;
@@ -42,7 +42,7 @@ static unsigned short checksum(const char *buf, unsigned size) {
 
 	if (size)
 	{
-		unsigned char s = *(unsigned char *) buf;
+		unsigned char s = *(const unsigned char *) buf;
 		sum += s;
 		if (sum < s) sum++;
 	}
@@ -60,7 +60,7 @@ static unsigned short checksum(const char *buf, unsigned size) {
 	return ~t3;
 }
 
-struct checksum_t *checksum_create() {
+struct checksum_t *checksum_create(void) {
     struct checksum_t *checksum = (struct checksum_t *)mem_alloc(sizeof(struct checksum_t));
 
     checksum->element.process = checksum_process;
@@ -88,6 +88,4 @@ void checksum_release(struct element_t *ele) {
     mem_release(ele);
 }
 
-void checksum_report(struct element_t *_) {
-    // VOID
-}
+void checksum_report(__attribute__((unused)) struct element_t *_) {}

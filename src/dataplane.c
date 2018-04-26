@@ -4,7 +4,6 @@
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-#include "rte_common.h"
 #include "rte_cycles.h"
 #include "rte_ethdev.h"
 #include "rte_malloc.h"
@@ -83,8 +82,8 @@ int port_configure(char const *port_name, struct dataplane_port_t **ppport) {
     // rte_eth_macaddr_get;
 
     /* Setup port RX buffer */
-    uint16_t pool_size = RTE_MAX(1 * (port->rx_desc + port->tx_desc + MAX_PKT_BURST +
-                MEMPOOL_CACHE_SIZE * 1), 8192U);
+    uint16_t pool_size = RTE_MAX(1U * (port->rx_desc + port->tx_desc + MAX_PKT_BURST +
+                MEMPOOL_CACHE_SIZE * 1U), 8192U);
 
 	log_info_fmt(GAP "Creating RX packet pool: %s [%d]", port_name, port_id);
     port->pool = rte_pktmbuf_pool_create(
@@ -130,6 +129,21 @@ int port_configure(char const *port_name, struct dataplane_port_t **ppport) {
     rte_eth_tx_buffer_set_err_callback(port->tx_buffer, dataplane_rebuffer_tx_callback, port);
     log_info_fmt(GAP "TX queue is setup: %s@0 [%d]", port_name, port_id);
 
+    port->tx_pool = rte_mempool_create(
+            NULL, 
+            ge_pow2_32(MAX_PKT_BURST * 64) - 1,
+            TX_ELE_SIZE,
+            0,
+            sizeof(struct rte_pktmbuf_pool_private),
+            rte_pktmbuf_pool_init,
+            NULL,
+            rte_pktmbuf_init, 0, // <-- create mpool for pcap here?
+            rte_lcore_to_socket_id(rte_lcore_id()),
+            MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
+    if (port->tx_pool == 0)
+        rte_exit(EXIT_FAILURE, "Failed to allocate the mempool buffer");
+
+
     ret = rte_eth_dev_start(port->port_id);
     if (ret < 0)
         goto cleanup;
@@ -146,65 +160,7 @@ int port_release(struct dataplane_port_t *port) {
     rte_eth_dev_stop(port->port_id);
     rte_eth_dev_close(port->port_id);
     mem_release(port);
-}
-
-packet_pool_t *dataplane_pool_create(struct dataplane_port_t *port) {
-    int packet_buffer = port->rx_desc * 2;
-    size_t pool_size = packet_buffer * sizeof(packet_t);
-
-    packet_pool_t *pool = mem_alloc_align(RTE_CACHE_LINE_SIZE, sizeof(packet_pool_t));
-    char *mem = mem_alloc_align(RTE_CACHE_LINE_SIZE, pool_size);
-    pool->packets = mem;
-    pool->size = packet_buffer;
-    pool->end = (void*)(mem + pool_size);
-    pool->cur = (packet_t *)mem;
-    pool->metadata = port;
-    //pool->pool_next_batch = dataplane_port_next_batch;
-    //pool->pool_reset = dataplane_port_reset;
-}
-
-
-#define mbuf_to_packet(mbuf, pkt) {\
-            pkt->hdr = rte_pktmbuf_mtod(pkt, char*);\
-            pkt->payload = cur->hdr;\
-            pkt->metadata = pkt;\
-}
-/*
-packet_index_t dataplane_port_next_batch (
-        struct packet_pool_t *pool, 
-        packet_t **pkts, 
-        packet_index_t num_pkts) {
-
-    dataplane_port_t *port = pool->metadata;
-    uint16_t port = port->port_id;
-    packet_t *cur = pool->cur;
-    packet_t *end = pool->end;
-
-    rte_mbuf *rx_burst = port->rx_burst;
-    rte_mbuf *m = 0;
-    uint16_t npkts = 0;
-
-    rx_burst_size = rte_eth_rx_burst(port_id, 0, &rx_burst, port->rx_burst_size);
-
-    if (unlikely(cur == end)) {
-        cur = end;
-    }
-
-    cur++;
-
-    npkts += rx_burst_size;
-    int i = 0;
-
-    for (i = 0; i < num_pkts; ++i) {
-        pkts[i]->hdr = (char *)m->buf_addr;
-        pkts[i]->payload = rte_pktmbuf_mtod(m, char *);
-    }
-}
-*/
-
-packet_t* dataplane_port_reset (struct packet_pool_t *pool) {
-    pool->cur = pool->packets;
-    return pool->cur;
+    return 0;
 }
 
 void dataplane_read_stats(struct dataplane_port_t *port) {
@@ -219,8 +175,8 @@ void dataplane_read_stats(struct dataplane_port_t *port) {
 	port->port_stats_time = curtime;
 }
 
-double cycles_to_seconds(uint64_t cycles) {
-    return ((double)rte_get_tsc_hz())/cycles;
+static double cycles_to_seconds(uint64_t cycles) {
+    return cycles/((double)rte_get_tsc_hz());
 }
 
 void dataplane_print_epoch_stats(struct dataplane_port_t *port) {
@@ -231,23 +187,19 @@ void dataplane_print_epoch_stats(struct dataplane_port_t *port) {
     uint64_t opktsdelta = ps->opackets - psp->opackets;
     uint64_t ipktsdelta = ps->ipackets - psp->ipackets;
 
-    uint64_t number = 0 | rte_get_tsc_hz();
-    number -= rte_get_tsc_hz();
-    //number = rte_get_tsc_hz();
-
     printf(
-".----------------------------------------------------------------------------------------------------.\n"
-"| Port (%1d) - MAC [%02X:%02X:%02X:%02X:%02X:%02X] - %f - %f - %"PRIu64" - %"PRIu64"                                                                |\n"
-"|----------------------------------------------------------------------------------------------------|\n"
-"| Out: %15" PRIu64 " | Out bytes: %20" PRIu64 " | Error: %15" PRIu64 " | Rate: %10.2f |\n"
-"|----------------------------------------------------------------------------------------------------|\n"
-"| In : %15" PRIu64 " |  In bytes: %20" PRIu64" | Missed: %14" PRIu64 " | Rate: %10.2f | Error: %15" PRIu64 " |\n"
-"*----------------------------------------------------------------------------------------------------*\n",
+".---------------------------------------------------------------------------------------------------------.\n"
+"| Port (%1d) - MAC [%02X:%02X:%02X:%02X:%02X:%02X]                                                                      |\n"
+"|---------------------------------------------------------------------------------------------------------|\n"
+"| Out: %15" PRIu64 " | Out bytes: %20" PRIu64 " | Error: %15" PRIu64 " | Rate: %15.2f |\n"
+"|---------------------------------------------------------------------------------------------------------|\n"
+"| In : %15" PRIu64 " |  In bytes: %20" PRIu64" | Missed: %14" PRIu64 " | Rate: %15.2f | Error: %15" PRIu64 " |\n"
+"*---------------------------------------------------------------------------------------------------------*\n",
             port->port_id,
             // port->port_mac.addr_bytes[0], port->port_mac.addr_bytes[1],
             // port->port_mac.addr_bytes[2], port->port_mac.addr_bytes[3],
             // port->port_mac.addr_bytes[4], port->port_mac.addr_bytes[5],
-			0, 0, 0, 0, 0, 0, cycles_to_seconds(delta), (float)delta, number, rte_get_tsc_hz(),
+			0, 0, 0, 0, 0, 0,
             ps->opackets, ps->obytes, ps->oerrors, opktsdelta/cycles_to_seconds(delta),
             ps->ipackets, ps->ibytes, ps->imissed, ipktsdelta/cycles_to_seconds(delta), ps->ierrors);
 }

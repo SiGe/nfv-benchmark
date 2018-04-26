@@ -47,7 +47,7 @@ inline packet_index_t packets_pool_next_batch(
     return pool_size;
 }
 
-inline packet_t *packets_pool_reset(packet_pool_t *pool) {
+packet_t *packets_pool_reset(packet_pool_t *pool) {
     pool->cur = pool->packets;
     return pool->cur;
 }

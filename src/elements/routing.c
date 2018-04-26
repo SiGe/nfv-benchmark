@@ -11,7 +11,9 @@
 
 #define PORT_MASK ((1<<ELEMENT_MAX_PORT_COUNT_LOG) - 1)
 
-static struct _routing_tbl_16_t *routing_table_new() {
+static struct _routing_tbl_16_t *routing_table_new(void);
+
+static struct _routing_tbl_16_t *routing_table_new(void) {
     struct _routing_tbl_16_t *new = (struct _routing_tbl_16_t *)mem_alloc(sizeof(struct _routing_tbl_16_t));
     memset(new, 0, sizeof(struct _routing_tbl_16_t));
     return new;
@@ -54,7 +56,8 @@ struct _routing_tbl_entry_t *routing_entry_find(struct routing_t *rt, ipv4_t ipv
     return ret;
 }
 
-static int _parse_ipv4_prefix(char const *line, size_t len, ipv4_prefix_t *out, port_index_t *outport) {
+static int _parse_ipv4_prefix(char const *line, __attribute__((unused)) size_t len,
+                              ipv4_prefix_t *out, port_index_t *outport) {
     int ip_chunks[4] = {0};
     int mask = 0, port = 0;
     out->ipv4 = 0;
@@ -82,7 +85,6 @@ int routing_file_load(struct routing_t *rt, char const *fname) {
     size_t read = 0, len = 0;
     ipv4_prefix_t buf;
     port_index_t outport;
-    int line = 0;
 
     char *lineptr = 0;
     while (-1 != (read = getline(&lineptr, &len, f))) {
@@ -107,7 +109,7 @@ void routing_entry_add(struct routing_t *rt, ipv4_prefix_t const *prefix, port_i
     /* If mask is smaller than 8, just add to the first tbl and be done */
     if (mask <= 8) {
         loc = &rt->fst_tbl.entry[prefix->ipv4 >> (32-mask)];
-        for (maskv4_t i = 0; i < 1 << (8-mask); ++i) {
+        for (maskv4_t i = 0; i < (1U << (8-mask)); ++i) {
             /* If the port has not been set before or the longest prefix match
              * is smaller than this one set the LPM to the port/lpm/and
              * port_valid to their right value. */
@@ -162,8 +164,8 @@ void routing_entry_add(struct routing_t *rt, ipv4_prefix_t const *prefix, port_i
     /* If mask is smaller than 4 */
     if (mask <= 4) {
         loc = &next_hop->entry[ipv4 >> remaining_mask];
-        ipv4 = ipv4 & ((1 << remaining_mask) - 1);
-        for (maskv4_t i = 0; i < 1 << (4-mask); ++i) {
+        ipv4 = ipv4 & ((1U << remaining_mask) - 1);
+        for (maskv4_t i = 0; i < 1U << (4-mask); ++i) {
             /* If the port has not been set before or the longest prefix match
              * is smaller than this one set the LPM to the port/lpm/and
              * port_valid to their right value. */
@@ -179,7 +181,7 @@ void routing_entry_add(struct routing_t *rt, ipv4_prefix_t const *prefix, port_i
     }
 }
 
-struct routing_t *routing_create() {
+struct routing_t *routing_create(void) {
     struct routing_t *ret = mem_alloc(sizeof(struct routing_t));
     memset(ret, 0, sizeof(struct routing_t));
     ret->element.process = routing_process;
@@ -222,7 +224,6 @@ static void routing_release_tbl(struct _routing_tbl_16_t *tbl) {
 }
 
 void routing_release(struct element_t *el) {
-    struct _routing_tbl_16_t *tbl = 0;
     struct _routing_tbl_256_t *fst = &((struct routing_t *)el)->fst_tbl;
     for (int i = 0; i < 256; ++i) {
         if (fst->entry[i].tbl_valid) {
@@ -232,5 +233,5 @@ void routing_release(struct element_t *el) {
     mem_release(el);
 }
 
-void routing_report(struct element_t *_) {
+void routing_report(__attribute__((unused)) struct element_t *_) {
 }

@@ -26,7 +26,7 @@ struct packet_pool_t {
     packet_t *end;
 
     packet_index_t (*pool_next_batch) (struct packet_pool_t *, packet_t **, packet_index_t);
-    struct packet_pool_t* (*pool_reset) (struct packet_pool_t *);
+    struct packet_t* (*pool_reset) (struct packet_pool_t *);
 
     void *metadata;
     char extra[256];

@@ -13,7 +13,7 @@ void measurement_resize(struct measurement_t *self, size_t size) {
     self->tbl = mem_realloc(self->tbl, sizeof(uint32_t) * size);
 }
 
-struct measurement_t *measurement_create() {
+struct measurement_t *measurement_create(void) {
     struct measurement_t *measurement = (struct measurement_t *)mem_alloc(sizeof(struct measurement_t));
 
     measurement->element.process = measurement_process_prefetching;
@@ -131,6 +131,6 @@ void measurement_release(struct element_t *ele) {
     mem_release(self);
 }
 
-void measurement_report(struct element_t *_) {
+void measurement_report(__attribute__((unused)) struct element_t *_) {
     // VOID
 }

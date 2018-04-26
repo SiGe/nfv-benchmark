@@ -2,7 +2,7 @@
 #include "element.h"
 #include "elements/identity.h"
 
-struct identity_t *identity_create() {
+struct identity_t *identity_create(void) {
     struct identity_t *identity = (struct identity_t *)mem_alloc(sizeof(struct identity_t));
 
     identity->element.process = identity_process;
@@ -25,6 +25,6 @@ void identity_release(struct element_t *ele) {
     mem_release(ele);
 }
 
-void identity_report(struct element_t *_) {
+void identity_report(__attribute__((unused)) struct element_t *_) {
     // VOID
 }

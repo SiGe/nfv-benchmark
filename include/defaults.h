@@ -14,7 +14,7 @@
 #endif
 
 #ifndef PACKET_SIZE
-#define PACKET_SIZE 1400
+#define PACKET_SIZE 64
 #endif
 
 #ifndef REPEAT

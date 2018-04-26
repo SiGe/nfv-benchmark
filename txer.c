@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "rte_ethdev.h"
+#include "rte_malloc.h"
 
 #include "benchmark.h"
 #include "dataplane.h"
@@ -16,10 +17,16 @@
 #include "rte_cycles.h"
 #include "rte_prefetch.h"
 
-#define TX_ELE_SIZE 2048
-#define TX_POOL_SIZE (MAX_PKT_BURST * TX_ELE_SIZE)
+#undef REPEAT
+#define REPEAT 200
 
-#define REPEAT 20
+enum {CONSOLE_PRINT=0, CONSOLE_STOP};
+#define CONSOLE_FREQ 200
+static int console_status = CONSOLE_STOP;
+
+int txer(void *);
+int datapath_init(int argc, char **, struct dataplane_port_t **);
+void datapath_teardown(struct dataplane_port_t *);
 
 /* TODO:
  * Normal vs. DDOS distribution packet size distribution
@@ -39,20 +46,6 @@ int txer(void *arg) {
     struct packet_pool_t *pool = packets_pool_create(packet_count, PACKET_SIZE);
     log_info("Done preparation of packet pool.");
 
-    struct rte_mempool *mbuf_pool = rte_mempool_create(
-            NULL, 
-            ge_pow2_32(MAX_PKT_BURST * 1024) - 1,
-            TX_ELE_SIZE,
-            0,
-            sizeof(struct rte_pktmbuf_pool_private),
-            rte_pktmbuf_pool_init,
-            NULL,
-            rte_pktmbuf_init, 0, // <-- create mpool for pcap here?
-            rte_lcore_to_socket_id(rte_lcore_id()),
-            MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
-    if (mbuf_pool == 0)
-        rte_exit(EXIT_FAILURE, "Failed to allocate the mempool buffer");
-
     // Create a zipfian distribution for source/destination ip address
     packets_pool_zipfian(pool, 0, packet_count - 1, 26, 8, 0.5);
 
@@ -60,7 +53,6 @@ int txer(void *arg) {
         packet_t *pkts[MAX_PKT_BURST] = {0};
         packet_index_t batch_size = 0;
         packet_index_t idx;
-        struct rte_mbuf *m;
         struct rte_eth_dev_tx_buffer *buffer = port->tx_buffer;
 
         /*
@@ -75,10 +67,23 @@ int txer(void *arg) {
         buffer->size = MAX_PKT_BURST;
         rte_eth_tx_buffer_set_err_callback(buffer, rte_eth_tx_buffer_drop_callback, NULL);
         */
+        struct rte_eth_link link;
+        log_info("Waiting for port to bootup.");
+        while (1) {
+            rte_eth_link_get_nowait(port->port_id, &link);
+            printf(".");
+            if (link.link_status == ETH_LINK_UP){
+                printf("\n");
+                break;
+            }
+        }
 
         // Benchmark the running time of the jitted test
         // Put a memory barrier for benchmarks
-        log_info("Preparing to send packets.");
+        log_info("Waiting for 2 seconds before sending packets.");
+        rte_delay_ms(2000);
+        console_status = CONSOLE_PRINT;
+
         uint64_t count = 0;
         uint64_t npkts = 0;
         asm volatile ("mfence" ::: "memory");
@@ -90,23 +95,20 @@ int txer(void *arg) {
 			while ((batch_size = packets_pool_next_batch(pool, pkts, MAX_PKT_BURST)) != 0) {
 				for (idx = 0; idx < batch_size; ++idx) {
 					packet_t *pkt = pkts[idx];
-					m = rte_pktmbuf_alloc(mbuf_pool);
-					rte_memcpy((uint8_t*)m->buf_addr + m->data_off, pkt->hdr, pkt->size);
-					m->pkt_len = pkt->size;
-					m->data_len = pkt->size;
-
-					npkts += rte_eth_tx_buffer(port_id, queue_id, buffer, m);
+					npkts += packet_send(port, pkt);
 				}
 				count+= batch_size;
 			}
 			packets_pool_reset(pool);
 		}
 
-        rte_free(buffer);
-        rte_mempool_free(mbuf_pool);
-
+        rte_eth_tx_buffer_flush(port_id, queue_id, buffer);
         asm volatile ("mfence" ::: "memory");
-        log_info_fmt("num cycles per packet (%.2f)", (float)(rte_get_tsc_cycles() - cycles)/(float)(packet_count * REPEAT));
+        uint64_t end = rte_get_tsc_cycles();
+        console_status = CONSOLE_STOP;
+        rte_delay_ms(CONSOLE_FREQ);
+        log_info_fmt("num cycles per packet (%.2f)", (float)(end - cycles)/(float)(packet_count * REPEAT));
+        rte_free(buffer);
     }
 
     packets_pool_delete(&pool);
@@ -163,12 +165,15 @@ int main(int argc, char **argv) {
 				break;
 			}
 		}
-		sleep(1);
-		dataplane_read_stats(port);
-		dataplane_print_epoch_stats(port);
+        rte_delay_ms(CONSOLE_FREQ);
+        if (console_status == CONSOLE_PRINT) {
+            printf("\e[1;1H\e[2J");
+            dataplane_read_stats(port);
+            dataplane_print_epoch_stats(port);
+        }
 	}
 
-	sleep(3);
+	rte_delay_ms(5000);
 	dataplane_read_stats(port);
 	dataplane_print_epoch_stats(port);
     datapath_teardown(port);
