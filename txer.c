@@ -18,7 +18,7 @@
 #include "rte_prefetch.h"
 
 #undef REPEAT
-#define REPEAT 200
+#define REPEAT 2000000000
 
 enum {CONSOLE_PRINT=0, CONSOLE_STOP};
 #define CONSOLE_FREQ 200
@@ -40,14 +40,14 @@ int txer(void *arg) {
     uint16_t port_id = port->port_id;
     uint16_t queue_id = 0;
 
-    uint32_t packet_count = 1<<20;
+    uint32_t packet_count = 1<<24;
 
     log_info("Preparing packet pool.");
     struct packet_pool_t *pool = packets_pool_create(packet_count, PACKET_SIZE);
     log_info("Done preparation of packet pool.");
 
     // Create a zipfian distribution for source/destination ip address
-    packets_pool_zipfian(pool, 0, packet_count - 1, 26, 8, 0.5);
+    packets_pool_zipfian(pool, 0, packet_count - 1, 26, 8, 1.1);
 
     {
         packet_t *pkts[MAX_PKT_BURST] = {0};
@@ -72,6 +72,8 @@ int txer(void *arg) {
         while (1) {
             rte_eth_link_get_nowait(port->port_id, &link);
             printf(".");
+            rte_delay_ms(500);
+            fflush(stdout);
             if (link.link_status == ETH_LINK_UP){
                 printf("\n");
                 break;
@@ -97,6 +99,8 @@ int txer(void *arg) {
 					packet_t *pkt = pkts[idx];
 					npkts += packet_send(port, pkt);
 				}
+                rte_delay_us(10); //@64
+                //rte_delay_us(10); //@256
 				count+= batch_size;
 			}
 			packets_pool_reset(pool);
