@@ -1,10 +1,12 @@
 #ifndef _FLL_H_
 #define _FLL_H_
 
+#include "memory.h"
+
 /*
  * Frequency locked loop between a slave and a master.
  * 
- * Use AIMD to ensure that there is no packet loss on the slave side.  The
+ * Use binary search to ensure there is no packet loss on the slave side.  The
  * algorithm works as follows: 
  *  1) the master starts to send packets at max rate,
  *  2) the slave checks to see if there is packet loss on its side.
@@ -28,7 +30,7 @@ struct fll_t {
     uint32_t current;
 };
 
-inline int fll_is_fll(char *data) {
+inline int fll_is_fll_pkt(char *data) {
     struct fll_packet_t *pkt = (struct fll_packet_t*)data;
     return pkt->magic == FLL_MAGIC;
 }
@@ -37,7 +39,7 @@ inline int fll_master(struct fll_t *fll, int loss, char *buffer) {
     if (fll->lower == fll->current || fll->current == fll->upper || loss < FLL_THRESHOLD)
         return 1;
 
-    if (loss == 0) {
+    if (loss != 0) {
         fll->lower = fll->current;
     } else {
         fll->upper = fll->current;
@@ -51,7 +53,23 @@ inline int fll_master(struct fll_t *fll, int loss, char *buffer) {
 
 inline int fll_follower(struct fll_t *fll, char *data) {
     struct fll_packet_t *pkt = (struct fll_packet_t*)data;
-    rte_delay_us(pkt->delay);
+    fll->current = pkt->delay;
+}
+
+inline int fll_delay(struct fll_t *fll) {
+    rte_delay_us(fll->current);
+}
+
+inline struct fll_t* fll_create() {
+    struct fll_t *fll = mem_alloc(sizeof(struct fll_t));
+    fll->upper = FLL_UPPER;
+    fll->lower = FLL_LOWER;
+    fll->current = fll->upper;
+    return fll;
+}
+
+inline void fll_release(struct fll_t *fll) {
+    mem_release(fll);
 }
 
 #endif // _FLL_H_

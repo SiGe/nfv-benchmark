@@ -9,6 +9,7 @@
 
 #include "benchmark.h"
 #include "dataplane.h"
+#include "fll.h"
 #include "jit.h"
 #include "log.h"
 #include "packets.h"
@@ -16,6 +17,8 @@
 
 #include "rte_cycles.h"
 #include "rte_prefetch.h"
+
+#define RX_BURST 32
 
 #undef REPEAT
 #define REPEAT 2000000000
@@ -55,18 +58,6 @@ int txer(void *arg) {
         packet_index_t idx;
         struct rte_eth_dev_tx_buffer *buffer = port->tx_buffer;
 
-        /*
-        size_t buffer_size = RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST);
-        log_info_fmt("Allocated %lu for the buffer", buffer_size);
-        struct rte_eth_dev_tx_buffer *buffer = (struct rte_eth_dev_tx_buffer*)
-            rte_zmalloc_socket("tx-buffer", buffer_size, 0, rte_eth_dev_socket_id(port));
-        if (buffer == 0)
-            rte_exit(EXIT_FAILURE, "Failed to allocate tx buffer to send packets out.");
-
-        //rte_eth_tx_buffer_init(buffer, MAX_PKT_BURST);
-        buffer->size = MAX_PKT_BURST;
-        rte_eth_tx_buffer_set_err_callback(buffer, rte_eth_tx_buffer_drop_callback, NULL);
-        */
         struct rte_eth_link link;
         log_info("Waiting for port to bootup.");
         while (1) {
@@ -91,6 +82,9 @@ int txer(void *arg) {
         asm volatile ("mfence" ::: "memory");
         uint64_t cycles = rte_get_tsc_cycles();
 		unsigned repeat = REPEAT;
+        struct rte_mbuf *rx_mbufs[RX_BURST];
+
+        struct fll_t *fll = fll_create();
 
 		while (repeat > 0) {
 			repeat--;
@@ -99,8 +93,19 @@ int txer(void *arg) {
 					packet_t *pkt = pkts[idx];
 					npkts += packet_send(port, pkt);
 				}
-                rte_delay_us(10); //@64
-                //rte_delay_us(10); //@256
+
+                npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
+                if (npkts != 0) {
+                    for (int i = 0; i < npkts; ++i) {
+                        char *hdr = rte_pktmbuf_mtod(rx_mbufs[i], char *);
+                        if (fll_is_fll_pkt(hdr)) {
+                            fll_follower(fll, hdr);
+                        }
+                        rte_pktmbuf_free(rx_mbufs[i]);
+                    }
+                }
+
+                fll_delay(fll);
 				count+= batch_size;
 			}
 			packets_pool_reset(pool);
@@ -113,6 +118,7 @@ int txer(void *arg) {
         rte_delay_ms(CONSOLE_FREQ);
         log_info_fmt("num cycles per packet (%.2f)", (float)(end - cycles)/(float)(packet_count * REPEAT));
         rte_free(buffer);
+        fll_release(fll);
     }
 
     packets_pool_delete(&pool);

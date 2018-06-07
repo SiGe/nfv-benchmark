@@ -33,6 +33,121 @@ int  rxer(void *);
 int  datapath_init(int argc, char **, struct dataplane_port_t **);
 void datapath_teardown(struct dataplane_port_t *);
 
+
+void fll_loop(struct dataplane_port_t *port, 
+              struct pipeline *pipe, 
+              struct rx_packet_stream *stream) {
+
+    const uint16_t port_id = port->port_id;
+    const uint16_t queue_id = port->queue_id;
+    uint16_t npkts = 0;
+    struct rte_mbuf *rx_mbufs[RX_BURST];
+    struct packet_t *rx_pkts[RX_BURST];
+
+    struct packet_t *fll_pkt = mem_alloc(sizeof(struct packet_t) + 64);
+    struct fll_t *fll = fll_create();
+
+    fll_pkt->size = 64;
+    fll_pkt->hdr = fll->data;
+    fll_pkt->payload = fll->data;
+    fll_pkt->metadata = 0;
+
+    int packet_count = 0;
+    int last_packet_count = 0;
+    int rx_time = 0;
+    rte_eth_stats_get(port_id, &stats);
+    packet_missed = stats.imissed;
+
+    if (run > 0)
+        g_record_time = 1;
+
+    while (1) {
+        npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
+        if (npkts == 0)
+            continue;
+
+        packet_count += npkts;
+        rx_stream_mtop(stream, rx_mbufs, npkts, rx_pkts);
+        rx_diff = rte_get_tsc_cycles();
+        pipeline_process(pipe, rx_pkts, npkts);
+        rx_time += rte_get_tsc_cycles() - rx_diff;
+
+        if (unlikely(packet_count > (last_packet_count + (1<<16)))) {
+            rte_eth_stats_get(port_id, &stats);
+            last_packet_count = packet_count;
+
+            int loss = stats.imissed - imissed;
+            imissed = stats.imissed;
+
+            int ret = fll_master(fll, loss, fll_pkt->data);
+            if (ret == 1) break;
+
+            packet_send(port, fll_pkt);
+            rte_eth_tx_buffer_flush(port->port_id, port->queue_id, port->tx_buffer);
+
+            // check how many packets we missed ...
+            rte_eth_stats_get(port_id, &stats);
+            imissed = stats.imissed;
+        }
+    }
+
+    mem_release(fll_pkt);
+    fll_release(fll);
+}
+
+void benchmark_loop(struct dataplane_port_t *port, 
+              struct pipeline *pipe, 
+              struct rx_packet_stream *stream) {
+    const uint16_t port_id = port->port_id;
+    const uint16_t queue_id = port->queue_id;
+    uint16_t npkts = 0;
+    struct rte_mbuf *rx_mbufs[RX_BURST];
+    struct packet_t *rx_pkts[RX_BURST];
+
+    int packet_count = 0;
+    int rx_time = 0;
+    rte_eth_stats_get(port_id, &stats);
+    packet_missed = stats.imissed;
+
+    if (run > 0)
+        g_record_time = 1;
+
+    while (1) {
+        npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
+        if (npkts == 0)
+            continue;
+        packet_count += npkts;
+        rx_stream_mtop(stream, rx_mbufs, npkts, rx_pkts);
+        rx_diff = rte_get_tsc_cycles();
+        pipeline_process(pipe, rx_pkts, npkts);
+        rx_time += rte_get_tsc_cycles() - rx_diff;
+        if (unlikely(packet_count > runs[run]))
+            break;
+    }
+
+    rte_eth_stats_get(port_id, &stats);
+    packet_missed -= stats.imissed;
+    assert(packet_missed < FLL_THRESHOLD);
+}
+
+void port_boot_wait(struct dataplane_port_t *port ){
+    struct rte_eth_link link;
+    log_info("Waiting for port to bootup.");
+    while (1) {
+        rte_eth_link_get_nowait(port->port_id, &link);
+        printf(".");
+        rte_delay_ms(500);
+        fflush(stdout);
+        if (link.link_status == ETH_LINK_UP){
+            printf("\n");
+            break;
+        }
+    }
+
+    log_info("Waiting for 2 seconds before receiving packets.");
+    rte_delay_ms(2000);
+}
+
 /* TODO:
  * Normal vs. DDOS distribution packet size distribution
  */
@@ -42,79 +157,31 @@ int rxer(void *arg) {
 		return 0;
 	}
 
-    {
-        struct rte_eth_dev_tx_buffer *buffer = port->tx_buffer;
-        struct rte_eth_link link;
-        log_info("Waiting for port to bootup.");
-        while (1) {
-            rte_eth_link_get_nowait(port->port_id, &link);
-            printf(".");
-            rte_delay_ms(500);
-            fflush(stdout);
-            if (link.link_status == ETH_LINK_UP){
-                printf("\n");
-                break;
-            }
-        }
+    port_boot_wait(port);
+    console_status = CONSOLE_PRINT;
 
-        log_info("Waiting for 2 seconds before receiving packets.");
-        rte_delay_ms(2000);
-        console_status = CONSOLE_PRINT;
+    /* Initiate the stream and pipeline */
+    const uint16_t port_id = port->port_id;
+    const uint16_t queue_id = port->queue_id;
+    struct rx_packet_stream *stream = 0;
+    if (rx_stream_create(LARGEST_BUFFER, rte_eth_dev_socket_id(port_id), &stream) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to allocate rx_stream buffer.");
+    struct pipeline_t *pipe = pipeline_build(stream);
 
-        const uint16_t port_id = port->port_id;
-        const uint16_t queue_id = port->queue_id;
-        uint16_t npkts = 0;
-        struct rte_mbuf *rx_mbufs[RX_BURST];
-        struct packet_t *rx_pkts[RX_BURST];
-        struct rx_packet_stream *stream = 0;
-        if (rx_stream_create(LARGEST_BUFFER, rte_eth_dev_socket_id(port_id), &stream) < 0)
-            rte_exit(EXIT_FAILURE, "Failed to allocate rx_stream buffer.");
-        asm volatile ("mfence" ::: "memory");
+    /* Run the frequency locked loop */
+    fll_loop(port, pipe, stream);
 
-        struct pipeline_t *pipe = pipeline_build(stream);
-        uint64_t rx_time = 0;
-        uint64_t rx_diff = 0;
+    /* Run the benchmark */
+    benchmark_loop(port, pipe, stream);
 
-        const uint64_t runs[] = { 1<<24, 1<<24 };
-        uint64_t packet_count = 0;
-        uint64_t packet_missed = 0;
-        struct rte_eth_stats stats;
+    /* Clean up whatever junk that remains */
+    pipeline_release(pipe);
+    rx_stream_release(stream);
+    struct rte_eth_dev_tx_buffer *buffer = port->tx_buffer;
+    rte_free(buffer);
 
-        for (unsigned run = 0; run < sizeof(runs)/sizeof(uint64_t); ++run) {
-            packet_count = 0;
-            rx_time = 0;
-            rte_eth_stats_get(port_id, &stats);
-            packet_missed = stats.imissed;
-            if (run > 0)
-                g_record_time = 1;
-
-            while (1) {
-                npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
-                if (npkts == 0)
-                    continue;
-                packet_count += npkts;
-                rx_stream_mtop(stream, rx_mbufs, npkts, rx_pkts);
-                rx_diff = rte_get_tsc_cycles();
-                pipeline_process(pipe, rx_pkts, npkts);
-                rx_time += rte_get_tsc_cycles() - rx_diff;
-                if (unlikely(packet_count > runs[run]))
-                    break;
-            }
-            rte_eth_stats_get(port_id, &stats);
-            packet_missed -= stats.imissed;
-        }
-
-        assert(packet_missed == 0);
-
-        pipeline_release(pipe);
-        rx_stream_release(stream);
-        asm volatile ("mfence" ::: "memory");
-        console_status = CONSOLE_STOP;
-        rte_delay_ms(CONSOLE_FREQ);
-        printf("num cycles per packet (%.2f)\n", (float)(rx_time)/(float)(packet_count));
-        rte_free(buffer);
-    }
-
+    console_status = CONSOLE_STOP;
+    rte_delay_ms(CONSOLE_FREQ);
     return 0;
 }
 
