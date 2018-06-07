@@ -1,7 +1,9 @@
 #ifndef _DATAPLANE_H_
 #define _DATAPLANE_H_
 
+#include "defaults.h"
 #include "packets.h"
+#include "rte_cycles.h"
 #include "rte_ethdev.h"
 #include "log.h"
 
@@ -12,6 +14,7 @@
 #define TX_ELE_SIZE 2048
 #define TX_POOL_SIZE (MAX_PKT_BURST * TX_ELE_SIZE)
 
+extern int g_record_time;
 
 struct dataplane_port_t {
     uint16_t    port_id;
@@ -58,6 +61,100 @@ static inline int packet_send(struct dataplane_port_t *port, packet_t *pkt) {
 
     return rte_eth_tx_buffer(port->port_id, port->queue_id, port->tx_buffer, m);
 };
+
+// An rx_packet_stream has two data structures:
+//     A mempool that holds (twice?) as many packets as the largest buffered element in the pipeline
+//     A ring that holds free pkt slots 
+//
+//     struct packet_t **pkts;
+//     int n = rx_burst()
+//     rte_ring_sc_dequeue_bulk(ring, pkts, n, 0);
+//
+//     for i : n {
+//         pkts[i]->hdr = rte_pktmbuf_mtod(m[i])
+//         pkts[i]->payload = ...
+//         pkts[i]->size = ...
+//         pkts[i]->metadata = mbuf[i]
+//     }
+//
+//     send_into_pipeline()
+//
+//     drop_mbuf() {
+//          for pkt : pkts {
+//              rte_pktmbuf_free(pkt->metadata);
+//          }
+//     }
+struct rx_packet_stream {
+    struct rte_ring *ring;
+    struct packet_t *pkts;
+    int size;
+};
+
+static inline
+int rx_stream_create(size_t size, int socket, struct rx_packet_stream **pstream) {
+    *pstream = rte_malloc_socket(0, sizeof(struct rx_packet_stream), 0, socket);
+    struct rx_packet_stream *stream = *pstream;
+
+    stream->ring = rte_ring_create(0, size, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
+    stream->pkts = rte_zmalloc_socket(0, sizeof(struct packet_t) * size, 0, socket);
+    stream->size = size;
+
+    // Enqueue the freespaces
+    for (size_t i = 0; i < size; ++i) {
+        rte_ring_enqueue(stream->ring, &stream->pkts[i]);
+    }
+    return 0;
+}
+
+static inline
+int rx_stream_release(struct rx_packet_stream *stream) {
+    rte_ring_free(stream->ring);
+    rte_free(stream->pkts);
+    rte_free(stream);
+    return 0;
+}
+
+static inline
+int rx_stream_mtop(struct rx_packet_stream *stream, 
+        struct rte_mbuf **ms, size_t n, packet_t **pkts) {
+     if (unlikely(rte_ring_sc_dequeue_bulk(stream->ring, pkts, n, 0) == 0))
+         rte_exit(EXIT_FAILURE, "Failed to dequeue enough packets slots.");
+
+     for (size_t i = 0; i < n; ++i) {
+         pkts[i]->hdr = rte_pktmbuf_mtod(ms[i], char *);
+         pkts[i]->payload = rte_pktmbuf_mtod(ms[i], char *) + 40;
+         pkts[i]->size = ms[i]->data_len;
+         pkts[i]->metadata = (void*)ms[i];
+         pkts[i]->time = 0;
+     }
+
+     return 0;
+}
+
+static inline
+int rx_stream_release_pkts(struct rx_packet_stream *stream,
+        packet_t **pkts, size_t n, uint32_t *hist) {
+     uint64_t time = rte_get_tsc_cycles();
+     uint64_t idx = 0;
+
+     if (g_record_time) {
+         for (size_t i = 0; i < n; ++i) {
+             rte_pktmbuf_free((struct rte_mbuf*)pkts[i]->metadata);
+             idx = (pkts[i]->time) >> HIST_PRECISION;
+             idx = (idx >= HIST_SIZE) ? HIST_SIZE-1 : idx;
+             hist[idx]++;
+             rte_ring_sp_enqueue(stream->ring, pkts[i]);
+         }
+     } else {
+         for (size_t i = 0; i < n; ++i) {
+             rte_pktmbuf_free((struct rte_mbuf*)pkts[i]->metadata);
+             rte_ring_sp_enqueue(stream->ring, pkts[i]);
+         }
+     }
+
+     return 0;
+}
+
 
 #endif // _DATAPLANE_H_
 

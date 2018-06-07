@@ -32,7 +32,7 @@ void log_err(const char *msg);
     char fmt[255] = {0};\
     snprintf(fmt, sizeof(fmt), LOG_GREEN "[INF] [%%s] ::" LOG_DONE " %s\n", _fmt);\
     GET_TIME(buffer);\
-    printf(fmt, buffer, ##__VA_ARGS__);\
+    fprintf(stderr, fmt, buffer, ##__VA_ARGS__);\
 }
 #else
 #define log_info_fmt(_fmt, ...) {}

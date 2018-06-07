@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "defaults.h"
 #include "element.h"
 #include "memory.h"
 #include "packets.h"
@@ -197,8 +198,11 @@ struct routing_t *routing_create(void) {
 void routing_process(struct element_t *el, struct packet_t **pkts, packet_index_t count) {
     struct routing_t *self = (struct routing_t *)el;
     uint32_t port_count = 0;
+
+    ELEMENT_TIME_START(pkts, count);
+
     for (packet_index_t i = 0; i < count; ++i) {
-        rte_prefetch0(pkts[i]->data);
+        rte_prefetch0(pkts[i]->hdr);
     }
 
     for (packet_index_t i = 0; i < count; ++i) {
@@ -208,6 +212,8 @@ void routing_process(struct element_t *el, struct packet_t **pkts, packet_index_
             ent->count ++;
         }
     }
+
+    ELEMENT_TIME_END(pkts, count);
 
     element_dispatch(el, port_count, pkts, count);
 }

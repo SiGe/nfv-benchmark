@@ -2,6 +2,7 @@
 #define _ELEMENT_H_
 
 #include "defaults.h"
+#include "rte_cycles.h"
 #include "packets.h"
 
 struct element_t;
@@ -41,4 +42,22 @@ void element_disconnect(
 
 element_t *element_hop_at(
         struct element_t *element, port_index_t port);
+
+#ifdef DEBUG_TIME
+#define ELEMENT_TIME_START(pkts, n) \
+    uint64_t __time = rte_get_tsc_cycles();
+
+#define ELEMENT_TIME_END(pkts, n) {\
+    __time = (rte_get_tsc_cycles() - __time) / n;\
+    for (packet_index_t i = 0; i < n; ++i) {\
+        pkts[i]->time += __time;\
+    }\
+}
+#else
+
+#define ELEMENT_TIME_START(pkts, n) {};
+#define ELEMENT_TIME_END(pkts, n) {};
+
+#endif // DEBUG_TIME
+
 #endif // _ELEMENT_H_

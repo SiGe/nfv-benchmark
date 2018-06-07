@@ -14,6 +14,8 @@
 
 #define GAP "\t\t"
 
+int g_record_time = 0;
+
 void dataplane_rebuffer_tx_callback(struct rte_mbuf **mbufs, uint16_t unsent, void *arg) {
     struct rte_eth_dev_tx_buffer *buffer = ((struct dataplane_port_t*)arg)->tx_buffer;
     uint16_t port = ((struct dataplane_port_t*)arg)->port_id;
