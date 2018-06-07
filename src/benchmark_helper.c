@@ -3,6 +3,7 @@
 #include "elements/buffered_element.h"
 #include "elements/checksum.h"
 #include "elements/drop.h"
+#include "elements/drop_mbuf.h"
 #include "elements/identity.h"
 #include "elements/measurement.h"
 #include "elements/routing.h"
@@ -51,3 +52,9 @@ inline struct element_t *el_measurement_create_with_size(
             (struct element_t*)monitor, size);
 }
 
+inline struct element_t *el_drop_mbuf_create(
+        packet_index_t size, struct rx_packet_stream* stream) {
+    struct drop_mbuf_t *drop = drop_mbuf_create(stream);
+    return (struct element_t *)buffered_element_create(
+            (struct element_t*)drop, size);
+}

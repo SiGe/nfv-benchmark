@@ -4,7 +4,9 @@
 #include "util.h"
 
 struct packet_t {
-    uint32_t size;
+    uint32_t size;              // size of the packet
+    uint64_t arrival_time;      // arrival time for the packet
+    uint64_t time;              // variable keeping track of time
 
     char *hdr;
     char *payload;

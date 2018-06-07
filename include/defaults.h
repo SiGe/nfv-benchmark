@@ -6,7 +6,8 @@
 #define MAX_PIPELINE_SIZE 128
 
 #define CACHE_LINE_SIZE 64
-
+#define DEBUG_TIME 1
+// #undef DEBUG_TIME
 
 /* Conditional variables */
 #ifndef BUFFER_SIZE
@@ -38,12 +39,21 @@
 #define DROP_BUFFER_SIZE 32
 #endif
 
+#ifndef MOD_BUFFER_SIZE_DROP
+#define MOD_BUFFER_SIZE_DROP DROP_BUFFER_SIZE
+#endif
+
+
 #ifndef MOD_BUFFER_SIZE_1
-#define MOD_BUFFER_SIZE_1 32
+//#define MOD_BUFFER_SIZE_1 32
 #endif
 
 #ifndef MOD_BUFFER_SIZE_2
-#define MOD_BUFFER_SIZE_2 32
+//#define MOD_BUFFER_SIZE_2 32
+#endif
+
+#ifndef MOD_BUFFER_SIZE_3
+#define MOD_BUFFER_SIZE_3 32
 #endif
 
 #ifndef BUFFER_SIZE
@@ -53,5 +63,16 @@
 #ifndef MEASUREMENT_BUFFER_SIZE
 #define MEASUREMENT_BUFFER_SIZE 32
 #endif
+
+// Histogram parameters
+#ifndef HIST_PRECISION
+#define HIST_PRECISION 0
+#endif
+
+#ifndef HIST_SIZE
+#define HIST_SIZE 4096
+#endif
+
+
 
 #endif //_DEFAULTS_H_

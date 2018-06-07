@@ -76,10 +76,14 @@ struct checksum_t *checksum_create(void) {
 void checksum_process(struct element_t *ele, struct packet_t **pkts, packet_index_t size) {
     struct checksum_t *self = ((struct checksum_t*)ele);
 
+    ELEMENT_TIME_START(pkts, size);
+
     for (packet_index_t i = 0; i < size; ++i) {
         packet_t *pkt = pkts[i];
-        self->checksum_count += checksum(pkt->data, pkt->size);
+        self->checksum_count += checksum(pkt->hdr, pkt->size);
     }
+
+    ELEMENT_TIME_END(pkts, size);
 
     element_dispatch(ele, 0, pkts, size);
 }

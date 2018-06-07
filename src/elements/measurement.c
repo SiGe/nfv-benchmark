@@ -42,17 +42,18 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
     size_t size_minus_one = self->tbl_size - 1;
     struct packet_t **pkt_ptr = pkts;
 
+    ELEMENT_TIME_START(pkts, size);
 
     while (idx > MEASUREMENT_BUFFER_SIZE) {
         for (packet_index_t i = 0; i < MEASUREMENT_BUFFER_SIZE; ++i) {
-            rte_prefetch0(pkt_ptr[i]->data + 26);
+            rte_prefetch0(pkt_ptr[i]->hdr + 26);
         }
 
         for (packet_index_t i = 0; i < MEASUREMENT_BUFFER_SIZE; ++i) {
-            ip.src = *((ipv4_t*)(pkt_ptr[i]->data+ 14 + 12));
-            ip.dst = *((ipv4_t*)(pkt_ptr[i]->data+ 14 + 12 + 4));
-            ip.src_port = *((uint16_t*)(pkt_ptr[i]->data+ 14 + 20 + 0));
-            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->data+ 14 + 20 + 2));
+            ip.src = *((ipv4_t*)(pkt_ptr[i]->hdr + 14 + 12));
+            ip.dst = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12 + 4));
+            ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
+            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
 
             util_hash(&ip, sizeof(ip), &out);
             out &= size_minus_one;
@@ -71,14 +72,14 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
 
     if (idx > 0) {
         for (packet_index_t i = 0; i < idx; ++i) {
-            rte_prefetch0(pkt_ptr[i]->data + 26);
+            rte_prefetch0(pkt_ptr[i]->hdr + 26);
         }
 
         for (packet_index_t i = 0; i < idx; ++i) {
-            ip.src = *((ipv4_t*)(pkt_ptr[i]->data+ 14 + 12));
-            ip.dst = *((ipv4_t*)(pkt_ptr[i]->data+ 14 + 12 + 4));
-            ip.src_port = *((uint16_t*)(pkt_ptr[i]->data+ 14 + 20 + 0));
-            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->data+ 14 + 20 + 2));
+            ip.src = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12));
+            ip.dst = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12 + 4));
+            ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
+            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
 
             util_hash(&ip, sizeof(ip), &out);
             out &= size_minus_one;
@@ -91,6 +92,8 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
             self->tbl[self->_tmp[i]]++;
         }
     }
+
+    ELEMENT_TIME_END(pkts, size);
 
     element_dispatch(ele, 0, pkts, size);
 }

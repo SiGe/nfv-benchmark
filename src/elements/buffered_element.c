@@ -23,7 +23,6 @@ struct buffered_element_t *buffered_element_create(
     port_t **ports = (port_t**)&element->ports;
     *ports = (port_t*)ele->self.ports[0];
 
-
     return ele;
 }
 
