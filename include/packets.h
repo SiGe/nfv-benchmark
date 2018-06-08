@@ -5,8 +5,9 @@
 
 struct packet_t {
     uint32_t size;              // size of the packet
-    uint64_t arrival_time;      // arrival time for the packet
+    uint64_t arrival;           // arrival time for the packet
     uint64_t time;              // variable keeping track of time
+    uint16_t queue_length;
 
     char *hdr;
     char *payload;

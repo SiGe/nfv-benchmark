@@ -26,13 +26,15 @@
 #define LARGEST_BUFFER (RX_BURST * 16)
 
 enum {CONSOLE_PRINT=0, CONSOLE_STOP};
-#define CONSOLE_FREQ 200
+#define CONSOLE_FREQ 1000
 static int console_status = CONSOLE_STOP;
 
 int  rxer(void *);
 int  datapath_init(int argc, char **, struct dataplane_port_t **);
 void datapath_teardown(struct dataplane_port_t *);
 
+struct fll_t *g_fll = 0;
+struct rx_packet_stream *g_stream = 0;
 
 void fll_loop(struct dataplane_port_t *port, 
               struct pipeline *pipe, 
@@ -45,21 +47,29 @@ void fll_loop(struct dataplane_port_t *port,
     struct packet_t *rx_pkts[RX_BURST];
 
     struct packet_t *fll_pkt = mem_alloc(sizeof(struct packet_t) + 64);
-    struct fll_t *fll = fll_create();
+    struct fll_t *fll = g_fll = fll_create();
 
     fll_pkt->size = 64;
-    fll_pkt->hdr = fll->data;
-    fll_pkt->payload = fll->data;
+    fll_pkt->hdr = fll_pkt->data;
+    fll_pkt->payload = fll_pkt->data;
     fll_pkt->metadata = 0;
+    memset(fll_pkt->data, 0, sizeof(char) * 64);
+    for (int i = 0; i < 14; ++i)
+        fll_pkt->data[i] = 12;
 
     int packet_count = 0;
     int last_packet_count = 0;
     int rx_time = 0;
+    uint64_t rx_diff = 0;
+    uint64_t packet_missed = 0;
+    struct rte_eth_stats stats;
+
     rte_eth_stats_get(port_id, &stats);
     packet_missed = stats.imissed;
 
-    if (run > 0)
-        g_record_time = 1;
+    // Make sure we aren't timing the packets
+    g_record_time = 0;
+
 
     while (1) {
         npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
@@ -72,14 +82,15 @@ void fll_loop(struct dataplane_port_t *port,
         pipeline_process(pipe, rx_pkts, npkts);
         rx_time += rte_get_tsc_cycles() - rx_diff;
 
-        if (unlikely(packet_count > (last_packet_count + (1<<16)))) {
+        if (unlikely(packet_count > (last_packet_count + (fll->count)))) {
             rte_eth_stats_get(port_id, &stats);
             last_packet_count = packet_count;
 
-            int loss = stats.imissed - imissed;
-            imissed = stats.imissed;
+            int loss = stats.imissed - packet_missed;
+            packet_missed = stats.imissed;
 
-            int ret = fll_master(fll, loss, fll_pkt->data);
+            int ret = fll_master(fll, loss, fll_pkt->data + 14);
+            //log_info_fmt("Locking at %d, %d, %d, loss at (%d)\n", fll->lower, fll->current, fll->upper, loss);
             if (ret == 1) break;
 
             packet_send(port, fll_pkt);
@@ -87,12 +98,50 @@ void fll_loop(struct dataplane_port_t *port,
 
             // check how many packets we missed ...
             rte_eth_stats_get(port_id, &stats);
-            imissed = stats.imissed;
+            packet_missed = stats.imissed;
         }
     }
 
     mem_release(fll_pkt);
-    fll_release(fll);
+    //g_fll = 0;
+    //fll_release(fll);
+}
+
+void warmup_loop(struct dataplane_port_t *port, 
+              struct pipeline *pipe, 
+              struct rx_packet_stream *stream) {
+    const uint16_t port_id = port->port_id;
+    const uint16_t queue_id = port->queue_id;
+    uint16_t npkts = 0;
+    struct rte_mbuf *rx_mbufs[RX_BURST];
+    struct packet_t *rx_pkts[RX_BURST];
+
+    int packet_count = 0;
+    int rx_time = 0;
+    uint64_t packet_missed = 0;
+    uint64_t rx_diff = 0;
+    struct rte_eth_stats stats;
+
+    rte_eth_stats_get(port_id, &stats);
+    packet_missed = stats.imissed;
+
+    g_record_time = 0;
+
+    while (packet_count < 1<<22) {
+        npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
+        if (npkts == 0)
+            continue;
+        packet_count += npkts;
+        rx_stream_mtop(stream, rx_mbufs, npkts, rx_pkts);
+        rx_diff = rte_get_tsc_cycles();
+        pipeline_process(pipe, rx_pkts, npkts);
+        rx_time += rte_get_tsc_cycles() - rx_diff;
+        if (unlikely(packet_count > 1<<26))
+            break;
+    }
+
+    rte_eth_stats_get(port_id, &stats);
+    packet_missed -= stats.imissed;
 }
 
 void benchmark_loop(struct dataplane_port_t *port, 
@@ -104,13 +153,20 @@ void benchmark_loop(struct dataplane_port_t *port,
     struct rte_mbuf *rx_mbufs[RX_BURST];
     struct packet_t *rx_pkts[RX_BURST];
 
+    g_stream = stream;
+
     int packet_count = 0;
     int rx_time = 0;
+    uint64_t packet_missed = 0;
+    uint64_t rx_diff = 0;
+    struct rte_eth_stats stats;
+
     rte_eth_stats_get(port_id, &stats);
     packet_missed = stats.imissed;
 
-    if (run > 0)
-        g_record_time = 1;
+
+    /* Start the benchmark timing modules */
+    g_record_time = 1;
 
     while (1) {
         npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
@@ -121,13 +177,13 @@ void benchmark_loop(struct dataplane_port_t *port,
         rx_diff = rte_get_tsc_cycles();
         pipeline_process(pipe, rx_pkts, npkts);
         rx_time += rte_get_tsc_cycles() - rx_diff;
-        if (unlikely(packet_count > runs[run]))
+        if (unlikely(packet_count > 1<<24))
             break;
     }
 
     rte_eth_stats_get(port_id, &stats);
-    packet_missed -= stats.imissed;
-    assert(packet_missed < FLL_THRESHOLD);
+    packet_missed = stats.imissed - packet_missed;
+    //log_info_fmt("Lost %llu packets.\n", packet_missed);
 }
 
 void port_boot_wait(struct dataplane_port_t *port ){
@@ -167,9 +223,13 @@ int rxer(void *arg) {
     if (rx_stream_create(LARGEST_BUFFER, rte_eth_dev_socket_id(port_id), &stream) < 0)
         rte_exit(EXIT_FAILURE, "Failed to allocate rx_stream buffer.");
     struct pipeline_t *pipe = pipeline_build(stream);
+    /* Warm up loop */
+    warmup_loop(port, pipe, stream);
 
     /* Run the frequency locked loop */
     fll_loop(port, pipe, stream);
+
+    printf("Done with locking frequency.\n");
 
     /* Run the benchmark */
     benchmark_loop(port, pipe, stream);
@@ -238,6 +298,12 @@ int main(int argc, char **argv) {
         rte_delay_ms(CONSOLE_FREQ);
         if (console_status == CONSOLE_PRINT) {
             printf("\e[1;1H\e[2J");
+            if (g_fll)
+                printf("FLL delay is at %d, %d\n",  g_fll->current, g_fll->count);
+
+            if (g_stream)
+                printf("Average queue_length %.2f\n",  (double)(g_stream->average_queue_length) / (g_stream->packet_count+1));
+
             dataplane_read_stats(port);
             dataplane_print_epoch_stats(port);
         }

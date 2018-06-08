@@ -19,6 +19,14 @@ drop() {
 EOF
 }
 
+timer() {
+    buffer=$1
+    cat - <<EOF
+    pipeline_element_add(pipe, el_timer_create(MOD_BUFFER_SIZE_${buffer}));
+EOF
+}
+
+
 identity() {
     buffer=$1
     cat - <<EOF

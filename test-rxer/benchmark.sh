@@ -31,7 +31,7 @@ for modOne in ${modules}; do
         for sizeOne in ${sizes}; do
             for sizeTwo in ${sizes}; do
                 printf "%d\t%d\t" "$sizeOne" "$sizeTwo"
-                ./make-pipeline.sh $modOne,$sizeOne $modTwo,$sizeTwo drop,32 >"${LOGS}/build-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" 2>&1
+                ./make-pipeline.sh timer,256 $modOne,$sizeOne $modTwo,$sizeTwo drop,32 >"${LOGS}/build-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" 2>&1
                 if [ $? -ne 0 ]; then
                     printf "FAILED\n"
                     continue
@@ -45,11 +45,14 @@ for modOne in ${modules}; do
                     fi
                 done
                 cycles=$(cat out.log | tee "${LOGS}/run-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" | grep Percentile | awk '{out=out $3 "\t"} END {print out}')
+                FLL=$(cat out.log | grep FLL | tail -n 1 | cut -d',' -f1 | rev | cut -d' ' -f1 | rev)
+                rate=$(cat out.log | grep Rate | grep -v Out | tail -n 4 | head -n 3 | cut -d'|' -f5 | awk '{print $2}' | datamash mean 1)
+
                 #| grep cycles | rev | cut -d' ' -f1 | sed -e 's/[()]//g' | rev)
                 if [ $? -ne 0 ]; then
                     printf "FAILED\n"
                 else
-                    printf "%s\n" "$cycles"
+                    printf "%s\t%s\t%s\n" "$rate" "$FLL" "$cycles"
                 fi
             done
         done >"${RESULTS}/${modOne}-${modTwo}-${PACKET_SIZE}.csv"

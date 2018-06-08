@@ -97,7 +97,7 @@ int txer(void *arg) {
                 npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
                 if (npkts != 0) {
                     for (int i = 0; i < npkts; ++i) {
-                        char *hdr = rte_pktmbuf_mtod(rx_mbufs[i], char *);
+                        char *hdr = rte_pktmbuf_mtod(rx_mbufs[i], char *) + 14;
                         if (fll_is_fll_pkt(hdr)) {
                             fll_follower(fll, hdr);
                         }

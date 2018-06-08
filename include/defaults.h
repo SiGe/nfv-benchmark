@@ -36,7 +36,7 @@
 #endif
 
 #ifndef DROP_BUFFER_SIZE
-#define DROP_BUFFER_SIZE 32
+#define DROP_BUFFER_SIZE 256
 #endif
 
 #ifndef MOD_BUFFER_SIZE_DROP

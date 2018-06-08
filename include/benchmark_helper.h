@@ -8,6 +8,7 @@
 struct element_t;
 
 struct element_t *el_identity_create(packet_index_t size);
+struct element_t *el_timer_create(packet_index_t size);
 struct element_t *el_drop_create(packet_index_t size);
 struct element_t *el_checksum_create(packet_index_t size);
 struct element_t *el_routing_create(packet_index_t size);

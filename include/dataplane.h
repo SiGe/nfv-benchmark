@@ -1,6 +1,8 @@
 #ifndef _DATAPLANE_H_
 #define _DATAPLANE_H_
 
+#include <assert.h>
+
 #include "defaults.h"
 #include "packets.h"
 #include "rte_cycles.h"
@@ -88,6 +90,11 @@ struct rx_packet_stream {
     struct rte_ring *ring;
     struct packet_t *pkts;
     int size;
+    uint16_t queue_length;
+    uint32_t tmp;
+
+    uint64_t average_queue_length;
+    uint64_t packet_count;
 };
 
 static inline
@@ -98,6 +105,9 @@ int rx_stream_create(size_t size, int socket, struct rx_packet_stream **pstream)
     stream->ring = rte_ring_create(0, size, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
     stream->pkts = rte_zmalloc_socket(0, sizeof(struct packet_t) * size, 0, socket);
     stream->size = size;
+    stream->queue_length = 0;
+    stream->packet_count = 0;
+    stream->average_queue_length = 0;
 
     // Enqueue the freespaces
     for (size_t i = 0; i < size; ++i) {
@@ -125,7 +135,15 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
          pkts[i]->payload = rte_pktmbuf_mtod(ms[i], char *) + 40;
          pkts[i]->size = ms[i]->data_len;
          pkts[i]->metadata = (void*)ms[i];
-         pkts[i]->time = 0;
+         pkts[i]->queue_length = stream->queue_length + i;
+     }
+
+     stream->queue_length += n;
+     stream->tmp++;
+
+     if (unlikely(stream->tmp > 1000000)) {
+         stream->tmp = 0;
+         printf("%d: Queue length\n", stream->queue_length);
      }
 
      return 0;
@@ -134,23 +152,29 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
 static inline
 int rx_stream_release_pkts(struct rx_packet_stream *stream,
         packet_t **pkts, size_t n, uint32_t *hist) {
-     uint64_t time = rte_get_tsc_cycles();
      uint64_t idx = 0;
+     uint64_t delta = 0;
 
      if (g_record_time) {
+         uint64_t time = rte_get_tsc_cycles();
          for (size_t i = 0; i < n; ++i) {
              rte_pktmbuf_free((struct rte_mbuf*)pkts[i]->metadata);
-             idx = (pkts[i]->time) >> HIST_PRECISION;
+             rte_ring_sp_enqueue(stream->ring, pkts[i]);
+             stream->average_queue_length += pkts[i]->queue_length;
+             idx = ((time - pkts[i]->arrival) / pkts[i]->queue_length);
              idx = (idx >= HIST_SIZE) ? HIST_SIZE-1 : idx;
              hist[idx]++;
-             rte_ring_sp_enqueue(stream->ring, pkts[i]);
          }
+
      } else {
          for (size_t i = 0; i < n; ++i) {
              rte_pktmbuf_free((struct rte_mbuf*)pkts[i]->metadata);
              rte_ring_sp_enqueue(stream->ring, pkts[i]);
          }
      }
+
+     stream->queue_length -= n;
+     stream->packet_count += n;
 
      return 0;
 }

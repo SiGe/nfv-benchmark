@@ -43,7 +43,7 @@ void element_disconnect(
 element_t *element_hop_at(
         struct element_t *element, port_index_t port);
 
-#ifdef DEBUG_TIME
+#ifdef DEBUG_TIME_2
 #define ELEMENT_TIME_START(pkts, n) \
     uint64_t __time = rte_get_tsc_cycles();
 

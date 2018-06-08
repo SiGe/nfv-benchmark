@@ -7,8 +7,14 @@
 #include "elements/identity.h"
 #include "elements/measurement.h"
 #include "elements/routing.h"
+#include "elements/timer.h"
 
 #include "benchmark_helper.h"
+
+inline struct element_t *el_timer_create(packet_index_t size) {
+    return (struct element_t *)buffered_element_create(
+            (struct element_t*)timer_packet_create(), size);
+}
 
 inline struct element_t *el_identity_create(packet_index_t size) {
     return (struct element_t *)buffered_element_create(
