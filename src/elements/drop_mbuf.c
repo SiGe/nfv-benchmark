@@ -53,16 +53,16 @@ static void
 drop_mbuf_print_statistics(struct drop_mbuf_t *e) {
     float percentiles[] = {10, 50, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999};
     uint64_t drop_count = 0;
-    for (int i = 0; i < HIST_SIZE; ++i ){
+    for (uint32_t i = 0; i < HIST_SIZE; ++i ){
         drop_count += e->hist[i];
     }
-    for (int i = 0; i < sizeof(percentiles)/sizeof(float); ++i) {
+    for (uint32_t i = 0; i < sizeof(percentiles)/sizeof(float); ++i) {
         printf("Percentile\t%.4f\t%d\n", percentiles[i], drop_mbuf_percentile(e->hist, drop_count, percentiles[i]));
     }
 
     printf("Percentile\tAVG\t%.2f\n", drop_mbuf_average(e->hist, drop_count));
     printf("HIST Precision:%d\t", HIST_PRECISION);
-    for (int i = 0; i < HIST_SIZE; ++i ){
+    for (uint32_t i = 0; i < HIST_SIZE; ++i ){
         printf("%d\t", e->hist[i]);
     }
     printf("\n");

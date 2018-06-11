@@ -21,7 +21,7 @@
 #define FLL_MAGIC    (0xbeed5335)
 #define FLL_WND_SIZE (1<<10)
 
-#define FLL(pkt) ((struct fll_t *)(pkt))
+#define FLL(pkt) ((struct fll_packet_t*)(pkt))
 
 struct __attribute__((packed)) fll_packet_t {
     uint32_t magic;
@@ -96,7 +96,7 @@ inline void fll_pkt_reset(struct fll_t *fll, char *buffer) {
     FLL(buffer)->seq      = 0 ;
 }
 
-inline struct fll_t* fll_create() {
+inline struct fll_t* fll_create(void) {
     struct fll_t *fll = mem_alloc(sizeof(struct fll_t));
     fll->wnd_size     = FLL_WND_SIZE;
     fll->wnd_s        = 0;

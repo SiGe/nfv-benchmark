@@ -72,6 +72,8 @@ _benchmark_begin() {
 #include "dataplane.h"
 #include "pipeline.h"
 
+struct pipeline_t *pipeline_build(struct rx_packet_stream *);
+
 struct pipeline_t *pipeline_build(struct rx_packet_stream *stream) {
     struct pipeline_t *pipe = pipeline_create();
 EOF

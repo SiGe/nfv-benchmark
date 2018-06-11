@@ -37,7 +37,7 @@ struct fll_t *g_fll = 0;
 struct rx_packet_stream *g_stream = 0;
 
 void warmup_loop(struct dataplane_port_t *port, 
-              struct pipeline *pipe, 
+              struct pipeline_t *pipe, 
               struct rx_packet_stream *stream) {
     const uint16_t port_id = port->port_id;
     const uint16_t queue_id = port->queue_id;
@@ -74,7 +74,7 @@ void warmup_loop(struct dataplane_port_t *port,
 }
 
 void benchmark_loop(struct dataplane_port_t *port, 
-              struct pipeline *pipe, 
+              struct pipeline_t *pipe, 
               struct rx_packet_stream *stream) {
     const uint16_t port_id = port->port_id;
     const uint16_t queue_id = port->queue_id;
@@ -95,7 +95,7 @@ void benchmark_loop(struct dataplane_port_t *port,
 
     struct packet_t *fll_pkt = mem_alloc(sizeof(struct packet_t) + 64);
     // Setup the FLL mac header
-    for (int i = 0; i < 14; ++i) { fll_data[i] = 12; }
+    for (int i = 0; i < 14; ++i) { fll_pkt->data[i] = 12; }
 
     char *fll_buffer = fll_pkt->data + 14;
     fll_pkt_reset(fll, fll_buffer);
@@ -166,7 +166,6 @@ int rxer(void *arg) {
 
     /* Initiate the stream and pipeline */
     const uint16_t port_id = port->port_id;
-    const uint16_t queue_id = port->queue_id;
     struct rx_packet_stream *stream = 0;
     if (rx_stream_create(LARGEST_BUFFER, rte_eth_dev_socket_id(port_id), &stream) < 0)
         rte_exit(EXIT_FAILURE, "Failed to allocate rx_stream buffer.");
@@ -242,9 +241,6 @@ int main(int argc, char **argv) {
         rte_delay_ms(CONSOLE_FREQ);
         if (console_status == CONSOLE_PRINT) {
             printf("\e[1;1H\e[2J");
-            if (g_fll)
-                printf("FLL delay is at %d, %d\n",  g_fll->current, g_fll->count);
-
             if (g_stream)
                 printf("Average queue_length %.2f\n",  (double)(g_stream->average_queue_length) / (g_stream->packet_count+1));
 

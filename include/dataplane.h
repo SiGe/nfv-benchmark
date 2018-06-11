@@ -7,6 +7,7 @@
 #include "packets.h"
 #include "rte_cycles.h"
 #include "rte_ethdev.h"
+#include "rte_malloc.h"
 #include "log.h"
 
 #define RX_DESC 1024
@@ -126,11 +127,11 @@ int rx_stream_release(struct rx_packet_stream *stream) {
 
 static inline
 int rx_stream_mtop(struct rx_packet_stream *stream, 
-        struct rte_mbuf **ms, size_t n, packet_t **pkts) {
-     if (unlikely(rte_ring_sc_dequeue_bulk(stream->ring, pkts, n, 0) == 0))
+        struct rte_mbuf **ms, unsigned int n, packet_t **pkts) {
+     if (unlikely(rte_ring_sc_dequeue_bulk(stream->ring, (void **)pkts, n, 0) == 0))
          rte_exit(EXIT_FAILURE, "Failed to dequeue enough packets slots.");
 
-     for (size_t i = 0; i < n; ++i) {
+     for (unsigned int i = 0; i < n; ++i) {
          pkts[i]->hdr = rte_pktmbuf_mtod(ms[i], char *);
          pkts[i]->payload = rte_pktmbuf_mtod(ms[i], char *) + 40;
          pkts[i]->size = ms[i]->data_len;
@@ -146,7 +147,6 @@ static inline
 int rx_stream_release_pkts(struct rx_packet_stream *stream,
         packet_t **pkts, size_t n, uint32_t *hist) {
      uint64_t idx = 0;
-     uint64_t delta = 0;
 
      if (g_record_time) {
          uint64_t time = rte_get_tsc_cycles();
