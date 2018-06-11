@@ -41,35 +41,35 @@ struct fll_t {
     uint64_t last_ack;
 };
 
-inline void fll_ack(struct fll_t *fll, char *pkt) {
+static inline void fll_ack(struct fll_t *fll, char *pkt) {
     fll->wnd_s = FLL(pkt)->seq + 1;
 }
 
-inline uint64_t fll_num_pkts_to_send(struct fll_t *fll) {
+static inline uint64_t fll_num_pkts_to_send(struct fll_t *fll) {
     uint64_t end = fll->wnd_s + fll->wnd_size;
     if (end < fll->wnd_e)
         return 0;
     return end - fll->wnd_e;
 }
 
-inline void fll_pkts_sent(struct fll_t *fll, uint16_t cnt) {
+static inline void fll_pkts_sent(struct fll_t *fll, uint16_t cnt) {
     fll->wnd_e += cnt;
 }
 
-inline int fll_is_fll_pkt(char *data) {
+static inline int fll_is_fll_pkt(char *data) {
     return (FLL(data)->magic == FLL_MAGIC);
 }
 
-inline int fll_is_fll_ack(char *data) {
+static inline int fll_is_fll_ack(char *data) {
     return fll_is_fll_pkt(data) && (FLL(data)->reset == 0);
 }
 
-inline int fll_is_fll_reset(char *data) {
+static inline int fll_is_fll_reset(char *data) {
     return fll_is_fll_pkt(data) && (FLL(data)->reset == 1);
 }
 
 /* Master receives a FLL ack packet */
-inline int fll_sender_ack(struct fll_t *fll, char *buffer) {
+static inline int fll_sender_ack(struct fll_t *fll, char *buffer) {
     if (unlikely(FLL(buffer)->reset)) {
         fll->wnd_size = FLL(buffer)->wnd_size;
         fll->wnd_s    = FLL(buffer)->seq;
@@ -82,8 +82,7 @@ inline int fll_sender_ack(struct fll_t *fll, char *buffer) {
     return 0;
 }
 
-static
-inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received) {
+static inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received) {
     FLL(buffer)->magic    = FLL_MAGIC;
     FLL(buffer)->wnd_size = fll->wnd_size;
     FLL(buffer)->reset    = 0 ;
@@ -92,16 +91,14 @@ inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received) {
     return 0;
 }
 
-static
-inline void fll_pkt_reset(struct fll_t *fll, char *buffer) {
+static inline void fll_pkt_reset(struct fll_t *fll, char *buffer) {
     FLL(buffer)->magic    = FLL_MAGIC;
     FLL(buffer)->wnd_size = fll->wnd_size;
     FLL(buffer)->reset    = 1 ;
     FLL(buffer)->seq      = 0 ;
 }
 
-static
-inline struct fll_t* fll_create(void) {
+static inline struct fll_t* fll_create(void) {
     struct fll_t *fll = mem_alloc(sizeof(struct fll_t));
     fll->wnd_size     = FLL_WND_SIZE;
     fll->wnd_s        = 0;
@@ -110,7 +107,7 @@ inline struct fll_t* fll_create(void) {
     return fll;
 }
 
-inline void fll_release(struct fll_t *fll) {
+static inline void fll_release(struct fll_t *fll) {
     mem_release(fll);
 }
 
