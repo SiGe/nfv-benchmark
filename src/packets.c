@@ -78,6 +78,11 @@ packet_pool_t* packets_pool_create(uint32_t count, uint32_t size) {
             junk = (uint64_t*)(pkt->hdr + i*8);
             *junk = rand64_t();
         }
+
+        for (int i = 0; i < 14; ++i ) {
+            pkt->hdr[i] = 12;
+        }
+
         pkt->payload = pkt->hdr + 64;
     }
 

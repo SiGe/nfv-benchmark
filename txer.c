@@ -31,6 +31,8 @@ int txer(void *);
 int datapath_init(int argc, char **, struct dataplane_port_t **);
 void datapath_teardown(struct dataplane_port_t *);
 
+struct fll_t *g_fll = 0;
+
 /* TODO:
  * Normal vs. DDOS distribution packet size distribution
  */
@@ -43,7 +45,7 @@ int txer(void *arg) {
     uint16_t port_id = port->port_id;
     uint16_t queue_id = 0;
 
-    uint32_t packet_count = 1<<24;
+    uint32_t packet_count = 1<<20;
 
     log_info("Preparing packet pool.");
     struct packet_pool_t *pool = packets_pool_create(packet_count, PACKET_SIZE);
@@ -83,7 +85,7 @@ int txer(void *arg) {
 		unsigned repeat = REPEAT;
         struct rte_mbuf *rx_mbufs[RX_BURST];
 
-        struct fll_t *fll = fll_create();
+        struct fll_t *fll = g_fll = fll_create();
         packet_index_t burst_size = MAX_PKT_BURST;
 
 		while (repeat > 0) {
@@ -94,7 +96,7 @@ int txer(void *arg) {
 					npkts += packet_send(port, pkt);
 				}
                 // TODO: burst_size or npkts?  That's the question
-                fll_pkts_sent(npkts);
+                fll_pkts_sent(fll, npkts);
 
                 npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
                 if (npkts != 0) {
@@ -182,6 +184,10 @@ int main(int argc, char **argv) {
         rte_delay_ms(CONSOLE_FREQ);
         if (console_status == CONSOLE_PRINT) {
             printf("\e[1;1H\e[2J");
+            if (g_fll) {
+                printf("FLL Stats: \n");
+                printf("Send window: [%llu %llu %llu]\n", g_fll->wnd_s, g_fll->wnd_e, g_fll->wnd_s + g_fll->wnd_size);
+            }
             dataplane_read_stats(port);
             dataplane_print_epoch_stats(port);
         }
