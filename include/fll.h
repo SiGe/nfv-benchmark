@@ -14,11 +14,11 @@
  *      If not, it sends a request to decrease the interpacket delay.
 */
 
-#define FLL_UPPER 150
+#define FLL_UPPER 1
 #define FLL_LOWER 0
 #define FLL_MAGIC 0xbeed5335
-#define FLL_THRESHOLD 100
-#define FLL_PKT_COUNT_START 1<<16
+#define FLL_THRESHOLD 1000
+#define FLL_PKT_COUNT_START 1<<20
 #define FLL_PKT_COUNT_MAX   1<<24
 
 struct __attribute__((packed)) fll_packet_t {
@@ -27,10 +27,8 @@ struct __attribute__((packed)) fll_packet_t {
 };
 
 struct fll_t {
-    uint32_t upper;
-    uint32_t lower;
     uint32_t current;
-    uint32_t mode;
+    uint32_t lower;
     uint32_t count;
 };
 
@@ -40,24 +38,33 @@ inline int fll_is_fll_pkt(char *data) {
 }
 
 inline int fll_master(struct fll_t *fll, int loss, char *buffer) {
-    if (fll->lower == fll->upper || (loss != 0 && fll->count < FLL_PKT_COUNT_MAX && loss < FLL_THRESHOLD) || (loss == 0 && fll->count >= FLL_PKT_COUNT_MAX)) {
+    int acceptable_loss = (loss < FLL_THRESHOLD);
+    if (acceptable_loss) {
         if (fll->count >= FLL_PKT_COUNT_MAX)
             return 1;
         fll->count <<= 1;
     }
 
-    if (loss > 0) {
+    if (loss > FLL_THRESHOLD) {
         fll->current += 1;
     } else {
-        if (fll->current == 0)
+        if (fll->current == 0 && fll->count >= FLL_PKT_COUNT_MAX)
             return 1;
-        fll->current -= 1;
+
+        if (fll->current != 0)
+            fll->current -= 1;
     }
 
     struct fll_packet_t *pkt = (struct fll_packet_t *)buffer;
     pkt->magic = FLL_MAGIC;
     pkt->delay = fll->current;
     return 0;
+}
+
+inline void fll_create_pkt(uint16_t delay, char *buffer) {
+    struct fll_packet_t *pkt = (struct fll_packet_t *)buffer;
+    pkt->magic = FLL_MAGIC;
+    pkt->delay = delay;
 }
 
 inline int fll_follower(struct fll_t *fll, char *data) {
@@ -71,10 +78,8 @@ inline int fll_delay(struct fll_t *fll) {
 
 inline struct fll_t* fll_create() {
     struct fll_t *fll = mem_alloc(sizeof(struct fll_t));
-    fll->upper = FLL_UPPER;
     fll->lower = FLL_LOWER;
-    fll->current = fll->upper;
-    fll->mode = 1;
+    fll->current = FLL_UPPER;
     fll->count = FLL_PKT_COUNT_START;
     return fll;
 }

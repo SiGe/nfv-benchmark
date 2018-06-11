@@ -102,6 +102,11 @@ void fll_loop(struct dataplane_port_t *port,
         }
     }
 
+    fll->current += 2;
+    fll_create_pkt(fll->current, fll_pkt->data + 14);
+    packet_send(port, fll_pkt);
+    rte_eth_tx_buffer_flush(port->port_id, port->queue_id, port->tx_buffer);
+
     mem_release(fll_pkt);
     //g_fll = 0;
     //fll_release(fll);
@@ -155,7 +160,7 @@ void benchmark_loop(struct dataplane_port_t *port,
 
     g_stream = stream;
 
-    int packet_count = 0;
+    uint64_t packet_count = 0;
     int rx_time = 0;
     uint64_t packet_missed = 0;
     uint64_t rx_diff = 0;
@@ -177,7 +182,7 @@ void benchmark_loop(struct dataplane_port_t *port,
         rx_diff = rte_get_tsc_cycles();
         pipeline_process(pipe, rx_pkts, npkts);
         rx_time += rte_get_tsc_cycles() - rx_diff;
-        if (unlikely(packet_count > 1<<24))
+        if (unlikely(packet_count > 1<<26))
             break;
     }
 
@@ -229,7 +234,7 @@ int rxer(void *arg) {
     /* Run the frequency locked loop */
     fll_loop(port, pipe, stream);
 
-    printf("Done with locking frequency.\n");
+    //printf("Done with locking frequency.\n");
 
     /* Run the benchmark */
     benchmark_loop(port, pipe, stream);

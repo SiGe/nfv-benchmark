@@ -139,13 +139,6 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
      }
 
      stream->queue_length += n;
-     stream->tmp++;
-
-     if (unlikely(stream->tmp > 1000000)) {
-         stream->tmp = 0;
-         printf("%d: Queue length\n", stream->queue_length);
-     }
-
      return 0;
 }
 
