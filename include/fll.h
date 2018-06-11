@@ -5,82 +5,103 @@
 
 /*
  * Frequency locked loop between a slave and a master.
- * 
- * Use binary search to ensure there is no packet loss on the slave side.  The
- * algorithm works as follows: 
- *  1) the master starts to send packets at max rate,
- *  2) the slave checks to see if there is packet loss on its side.
- *      If yes, it sends a request to increase the delay between packets (in us)
- *      If not, it sends a request to decrease the interpacket delay.
 */
 
-#define FLL_UPPER 1
-#define FLL_LOWER 0
-#define FLL_MAGIC 0xbeed5335
-#define FLL_THRESHOLD 1000
-#define FLL_PKT_COUNT_START 1<<20
-#define FLL_PKT_COUNT_MAX   1<<24
+/*
+ * Master pseudo-code:
+ *
+ * TX/loop() {
+ *      while (true) {
+ *          to_send = min(fll.wnd_size - fll.in_flight)
+ *      }
+ * }
+ *
+ */
+
+#define FLL_MAGIC    (0xbeed5335)
+#define FLL_WND_SIZE (1<<10)
+
+#define FLL(pkt) ((struct fll_t *)(pkt))
 
 struct __attribute__((packed)) fll_packet_t {
     uint32_t magic;
-    uint32_t delay;
+    uint16_t reset;
+    uint16_t wnd_size;
+    uint64_t seq;
 };
 
 struct fll_t {
-    uint32_t current;
-    uint32_t lower;
-    uint32_t count;
+    /* Sender */
+    uint16_t wnd_size;
+    uint64_t wnd_s;
+    uint64_t wnd_e;
+
+    /* Receiver */
+    uint64_t last_ack;
 };
 
-inline int fll_is_fll_pkt(char *data) {
-    struct fll_packet_t *pkt = (struct fll_packet_t*)data;
-    return pkt->magic == FLL_MAGIC;
+inline void fll_ack(struct fll_t *fll, char *pkt) {
+    fll->wnd_s = FLL(pkt)->seq + 1;
 }
 
-inline int fll_master(struct fll_t *fll, int loss, char *buffer) {
-    int acceptable_loss = (loss < FLL_THRESHOLD);
-    if (acceptable_loss) {
-        if (fll->count >= FLL_PKT_COUNT_MAX)
-            return 1;
-        fll->count <<= 1;
+inline uint64_t fll_num_pkts_to_send(struct fll_t *fll) {
+    uint64_t end = fll->wnd_s + fll->wnd_size;
+    if (end < fll->wnd_e)
+        return 0;
+    return end - fll->wnd_e;
+}
+
+inline void fll_pkts_sent(struct fll_t *fll, uint16_t cnt) {
+    fll->wnd_e += cnt;
+}
+
+inline int fll_is_fll_pkt(char *data) {
+    return (FLL(data)->magic == FLL_MAGIC);
+}
+
+inline int fll_is_fll_ack(char *data) {
+    return fll_is_fll_pkt(data) && (FLL(data)->reset == 0);
+}
+
+inline int fll_is_fll_reset(char *data) {
+    return fll_is_fll_pkt(data) && (FLL(data)->reset == 1);
+}
+
+/* Master receives a FLL ack packet */
+inline int fll_sender_ack(struct fll_t *fll, char *buffer) {
+    if (unlikely(FLL(buffer)->reset)) {
+        fll->wnd_size = FLL(buffer)->wnd_size;
+        fll->wnd_s    = FLL(buffer)->seq;
+        fll->wnd_e    = fll->wnd_s;
+        return 0;
     }
 
-    if (loss > FLL_THRESHOLD) {
-        fll->current += 1;
-    } else {
-        if (fll->current == 0 && fll->count >= FLL_PKT_COUNT_MAX)
-            return 1;
-
-        if (fll->current != 0)
-            fll->current -= 1;
-    }
-
-    struct fll_packet_t *pkt = (struct fll_packet_t *)buffer;
-    pkt->magic = FLL_MAGIC;
-    pkt->delay = fll->current;
+    /* update the acknowledgement number */
+    fll_ack(fll, buffer);
     return 0;
 }
 
-inline void fll_create_pkt(uint16_t delay, char *buffer) {
-    struct fll_packet_t *pkt = (struct fll_packet_t *)buffer;
-    pkt->magic = FLL_MAGIC;
-    pkt->delay = delay;
+inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received) {
+    FLL(buffer)->magic    = FLL_MAGIC;
+    FLL(buffer)->wnd_size = fll->wnd_size;
+    FLL(buffer)->reset    = 0 ;
+    FLL(buffer)->seq      = fll->last_ack = fll->last_ack + received;
+    return 0;
 }
 
-inline int fll_follower(struct fll_t *fll, char *data) {
-    struct fll_packet_t *pkt = (struct fll_packet_t*)data;
-    fll->current = pkt->delay;
-}
-
-inline int fll_delay(struct fll_t *fll) {
-    rte_delay_us(fll->current);
+inline void fll_pkt_reset(struct fll_t *fll, char *buffer) {
+    FLL(buffer)->magic    = FLL_MAGIC;
+    FLL(buffer)->wnd_size = fll->wnd_size;
+    FLL(buffer)->reset    = 1 ;
+    FLL(buffer)->seq      = 0 ;
 }
 
 inline struct fll_t* fll_create() {
     struct fll_t *fll = mem_alloc(sizeof(struct fll_t));
-    fll->lower = FLL_LOWER;
-    fll->current = FLL_UPPER;
-    fll->count = FLL_PKT_COUNT_START;
+    fll->wnd_size     = FLL_WND_SIZE;
+    fll->wnd_s        = 0;
+    fll->wnd_e        = 0;
+    fll->last_ack     = 0;
     return fll;
 }
 

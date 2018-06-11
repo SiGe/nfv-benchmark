@@ -77,7 +77,6 @@ int txer(void *arg) {
         rte_delay_ms(2000);
         console_status = CONSOLE_PRINT;
 
-        uint64_t count = 0;
         uint64_t npkts = 0;
         asm volatile ("mfence" ::: "memory");
         uint64_t cycles = rte_get_tsc_cycles();
@@ -85,28 +84,33 @@ int txer(void *arg) {
         struct rte_mbuf *rx_mbufs[RX_BURST];
 
         struct fll_t *fll = fll_create();
+        packet_index_t burst_size = MAX_PKT_BURST;
 
 		while (repeat > 0) {
 			repeat--;
-			while ((batch_size = packets_pool_next_batch(pool, pkts, MAX_PKT_BURST)) != 0) {
+			while ((batch_size = packets_pool_next_batch(pool, pkts, burst_size)) != 0) {
 				for (idx = 0; idx < batch_size; ++idx) {
 					packet_t *pkt = pkts[idx];
 					npkts += packet_send(port, pkt);
 				}
+                // TODO: burst_size or npkts?  That's the question
+                fll_pkts_sent(npkts);
 
                 npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
                 if (npkts != 0) {
                     for (int i = 0; i < npkts; ++i) {
                         char *hdr = rte_pktmbuf_mtod(rx_mbufs[i], char *) + 14;
                         if (fll_is_fll_pkt(hdr)) {
-                            fll_follower(fll, hdr);
+                            fll_sender_ack(fll, hdr);
                         }
+
+                        // Release RX buffers
                         rte_pktmbuf_free(rx_mbufs[i]);
                     }
                 }
 
-                fll_delay(fll);
-				count+= batch_size;
+                burst_size = fll_num_pkts_to_send(fll);
+                burst_size = (burst_size > MAX_PKT_BURST) ? MAX_PKT_BURST : burst_size;
 			}
 			packets_pool_reset(pool);
 		}
