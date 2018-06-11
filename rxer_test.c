@@ -94,6 +94,11 @@ void benchmark_loop(struct dataplane_port_t *port,
 
 
     struct packet_t *fll_pkt = mem_alloc(sizeof(struct packet_t) + 64);
+    fll_pkt->size = 64;
+    fll_pkt->hdr = fll_pkt->data;
+    fll_pkt->payload = fll_pkt->data;
+    fll_pkt->metadata = 0;
+
     // Setup the FLL mac header
     for (int i = 0; i < 14; ++i) { fll_pkt->data[i] = 12; }
 
@@ -172,7 +177,7 @@ int rxer(void *arg) {
     struct pipeline_t *pipe = pipeline_build(stream);
 
     /* Warm up loop */
-    warmup_loop(port, pipe, stream);
+    // warmup_loop(port, pipe, stream);
 
     /* Run the benchmark */
     benchmark_loop(port, pipe, stream);

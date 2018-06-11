@@ -118,7 +118,8 @@ benchmark_compile() {
 
     echo ${define_args}
     make clean
-    make rxer-test PROFILE=optimized EXTRA="${define_args}"
+    #make rxer-test PROFILE=optimized EXTRA="${define_args}"
+    make rxer-test PROFILE=debug EXTRA="${define_args}"
 }
 
 usage() {

@@ -136,7 +136,7 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
          pkts[i]->payload = rte_pktmbuf_mtod(ms[i], char *) + 40;
          pkts[i]->size = ms[i]->data_len;
          pkts[i]->metadata = (void*)ms[i];
-         pkts[i]->queue_length = stream->queue_length + i;
+         pkts[i]->queue_length = stream->queue_length + i + 1;
      }
 
      stream->queue_length += n;

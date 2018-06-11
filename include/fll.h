@@ -1,6 +1,7 @@
 #ifndef _FLL_H_
 #define _FLL_H_
 
+#include "log.h"
 #include "memory.h"
 
 /*
@@ -81,14 +82,17 @@ inline int fll_sender_ack(struct fll_t *fll, char *buffer) {
     return 0;
 }
 
+static
 inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received) {
     FLL(buffer)->magic    = FLL_MAGIC;
     FLL(buffer)->wnd_size = fll->wnd_size;
     FLL(buffer)->reset    = 0 ;
     FLL(buffer)->seq      = fll->last_ack = fll->last_ack + received;
+    log_info_fmt("Sending ack: %llu\n", fll->last_ack);
     return 0;
 }
 
+static
 inline void fll_pkt_reset(struct fll_t *fll, char *buffer) {
     FLL(buffer)->magic    = FLL_MAGIC;
     FLL(buffer)->wnd_size = fll->wnd_size;
@@ -96,6 +100,7 @@ inline void fll_pkt_reset(struct fll_t *fll, char *buffer) {
     FLL(buffer)->seq      = 0 ;
 }
 
+static
 inline struct fll_t* fll_create(void) {
     struct fll_t *fll = mem_alloc(sizeof(struct fll_t));
     fll->wnd_size     = FLL_WND_SIZE;
