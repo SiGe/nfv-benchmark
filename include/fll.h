@@ -42,6 +42,7 @@ struct fll_t {
 };
 
 static inline void fll_ack(struct fll_t *fll, char *pkt) {
+    //log_info_fmt("Got ack: %llu\n", FLL(pkt)->seq);
     fll->wnd_s = FLL(pkt)->seq + 1;
 }
 
@@ -53,6 +54,7 @@ static inline uint64_t fll_num_pkts_to_send(struct fll_t *fll) {
 }
 
 static inline void fll_pkts_sent(struct fll_t *fll, uint16_t cnt) {
+    //log_info_fmt("Setting wnd_e to: %llu\n", fll->wnd_e + cnt);
     fll->wnd_e += cnt;
 }
 
@@ -70,10 +72,12 @@ static inline int fll_is_fll_reset(char *data) {
 
 /* Master receives a FLL ack packet */
 static inline int fll_sender_ack(struct fll_t *fll, char *buffer) {
-    if (unlikely(FLL(buffer)->reset)) {
+    //log_info_fmt("Reset value: %d\n", FLL(buffer)->reset);
+    if (unlikely(FLL(buffer)->reset == 1)) {
         fll->wnd_size = FLL(buffer)->wnd_size;
         fll->wnd_s    = FLL(buffer)->seq;
         fll->wnd_e    = fll->wnd_s;
+        //log_info_fmt("Resetting fll data-structure.\n");
         return 0;
     }
 
@@ -87,7 +91,7 @@ static inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received
     FLL(buffer)->wnd_size = fll->wnd_size;
     FLL(buffer)->reset    = 0 ;
     FLL(buffer)->seq      = fll->last_ack = fll->last_ack + received;
-    log_info_fmt("Sending ack: %llu\n", fll->last_ack);
+    //log_info_fmt("Sending ack: %llu\n", fll->last_ack);
     return 0;
 }
 
