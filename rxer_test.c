@@ -36,46 +36,11 @@ void datapath_teardown(struct dataplane_port_t *);
 struct fll_t *g_fll = 0;
 struct rx_packet_stream *g_stream = 0;
 
-void warmup_loop(struct dataplane_port_t *port, 
-              struct pipeline_t *pipe, 
-              struct rx_packet_stream *stream) {
-    const uint16_t port_id = port->port_id;
-    const uint16_t queue_id = port->queue_id;
-    uint16_t npkts = 0;
-    struct rte_mbuf *rx_mbufs[RX_BURST];
-    struct packet_t *rx_pkts[RX_BURST];
-
-    int packet_count = 0;
-    int rx_time = 0;
-    uint64_t packet_missed = 0;
-    uint64_t rx_diff = 0;
-    struct rte_eth_stats stats;
-
-    rte_eth_stats_get(port_id, &stats);
-    packet_missed = stats.imissed;
-
-    g_record_time = 0;
-
-    while (packet_count < 1<<22) {
-        npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
-        if (npkts == 0)
-            continue;
-        packet_count += npkts;
-        rx_stream_mtop(stream, rx_mbufs, npkts, rx_pkts);
-        rx_diff = rte_get_tsc_cycles();
-        pipeline_process(pipe, rx_pkts, npkts);
-        rx_time += rte_get_tsc_cycles() - rx_diff;
-        if (unlikely(packet_count > 1<<26))
-            break;
-    }
-
-    rte_eth_stats_get(port_id, &stats);
-    packet_missed -= stats.imissed;
-}
-
 void benchmark_loop(struct dataplane_port_t *port, 
               struct pipeline_t *pipe, 
-              struct rx_packet_stream *stream) {
+              struct rx_packet_stream *stream,
+              uint16_t record_time,
+              uint32_t num_packets) {
     const uint16_t port_id = port->port_id;
     const uint16_t queue_id = port->queue_id;
     uint16_t npkts = 0;
@@ -104,6 +69,7 @@ void benchmark_loop(struct dataplane_port_t *port,
 
     char *fll_buffer = fll_pkt->data + 14;
     fll_pkt_reset(fll, fll_buffer);
+    log_info_fmt("sending reset\n");
 
     // Reset the FLL buffer on the sender side
     packet_send(port, fll_pkt);
@@ -113,7 +79,7 @@ void benchmark_loop(struct dataplane_port_t *port,
     packet_missed = stats.imissed;
 
     /* Start the benchmark timing modules */
-    g_record_time = 1;
+    g_record_time = record_time;
 
     while (1) {
         npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
@@ -131,7 +97,7 @@ void benchmark_loop(struct dataplane_port_t *port,
         packet_send(port, fll_pkt);
         rte_eth_tx_buffer_flush(port->port_id, port->queue_id, port->tx_buffer);
 
-        if (unlikely(packet_count > 1<<26))
+        if (unlikely(packet_count > num_packets))
             break;
     }
 
@@ -180,7 +146,11 @@ int rxer(void *arg) {
     // warmup_loop(port, pipe, stream);
 
     /* Run the benchmark */
-    benchmark_loop(port, pipe, stream);
+    // Warmup loop
+    benchmark_loop(port, pipe, stream, 0, 1<<24);
+
+    // Benchmark loop
+    benchmark_loop(port, pipe, stream, 1, 1<<27);
 
     /* Clean up whatever junk that remains */
     pipeline_release(pipe);
@@ -248,6 +218,11 @@ int main(int argc, char **argv) {
             printf("\e[1;1H\e[2J");
             if (g_stream)
                 printf("Average queue_length %.2f\n",  (double)(g_stream->average_queue_length) / (g_stream->packet_count+1));
+
+            if (g_fll) {
+                printf("FLL Stats: \n");
+                printf("Send window: [%llu]\n", g_fll->last_ack);
+            }
 
             dataplane_read_stats(port);
             dataplane_print_epoch_stats(port);

@@ -38,7 +38,7 @@ measurement_large() {
     buffer=$1
     cat - <<EOF
     pipeline_element_add(pipe, el_measurement_create_with_size(MOD_BUFFER_SIZE_${buffer}, 
-        1 << 22));
+        1 << 24));
 EOF
 }
 
@@ -118,8 +118,8 @@ benchmark_compile() {
 
     echo ${define_args}
     make clean
-    #make rxer-test PROFILE=optimized EXTRA="${define_args}"
-    make rxer-test PROFILE=debug EXTRA="${define_args}"
+    make rxer-test PROFILE=optimized EXTRA="${define_args}"
+    #make rxer-test PROFILE=debug EXTRA="${define_args}"
 }
 
 usage() {

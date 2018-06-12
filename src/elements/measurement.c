@@ -1,3 +1,4 @@
+#include "log.h"
 #include "memory.h"
 #include "murmur3.h"
 #include "packets.h"
@@ -129,6 +130,15 @@ void measurement_process_no_prefetching(struct element_t *ele, struct packet_t *
 void measurement_release(struct element_t *ele) {
     struct measurement_t *self = (struct measurement_t *)ele;
     if (self->tbl) {
+        printf("Printing measurement moduel stats\n");
+        size_t size_minus_one = self->tbl_size - 1;
+        size_t total_unique = 0;
+        size_t total_count = 0;
+        for (int i = 0; i < size_minus_one; ++i) {
+            total_count += self->tbl[i];
+            total_unique += (self->tbl[i] != 0);
+        }
+        printf("Total unique: %d, total count: %d\n", total_unique, total_count);
         mem_release(self->tbl);
     }
     mem_release(self);

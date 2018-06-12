@@ -20,7 +20,7 @@
  */
 
 #define FLL_MAGIC    (0xbeed5335)
-#define FLL_WND_SIZE (1<<10)
+#define FLL_WND_SIZE (1<<12)
 
 #define FLL(pkt) ((struct fll_packet_t*)(pkt))
 
@@ -87,7 +87,7 @@ static inline int fll_pkt_ack(struct fll_t *fll, char *buffer, uint32_t received
     FLL(buffer)->wnd_size = fll->wnd_size;
     FLL(buffer)->reset    = 0 ;
     FLL(buffer)->seq      = fll->last_ack = fll->last_ack + received;
-    log_info_fmt("Sending ack: %llu\n", fll->last_ack);
+    //log_info_fmt("Sending ack: %llu\n", fll->last_ack);
     return 0;
 }
 

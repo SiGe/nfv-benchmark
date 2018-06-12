@@ -25,7 +25,8 @@ RESULTS="${BASE}/results"
 mkdir -p "${LOGS}"
 mkdir -p "${RESULTS}"
 
-REPEAT=5
+REPEAT=3
+EVENTS="cycles,instructions,cache-misses,cache-references,page-faults,context-switches,branches,branch-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-dcache-stores,L1-icache-load-misses"
 
 for modOne in ${modules}; do
     for modTwo in ${modules}; do
@@ -34,13 +35,13 @@ for modOne in ${modules}; do
             for sizeOne in ${sizes}; do
                 for sizeTwo in ${sizes}; do
                     printf "%d\t%d\t" "$sizeOne" "$sizeTwo"
-                    ./make-pipeline.sh timer,256 $modOne,$sizeOne $modTwo,$sizeTwo drop,32 >"${LOGS}/build-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" 2>&1
+                    ./make-pipeline.sh timer,256 measurement_large,32 $modOne,$sizeOne $modTwo,$sizeTwo drop,32 >"${LOGS}/build-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" 2>&1
                     if [ $? -ne 0 ]; then
                         printf "FAILED\n"
                         continue
                     fi
                     while : ; do
-                        sudo ../bin/rxer-test -l1-3 -n4 >out.log 2>&1
+                        sudo perf stat -e $EVENTS -C3 ../bin/rxer-test -l1-3 -n4 >out.log 2>&1
                         if grep -Fxq "FATAL" out.log; then
                             continue
                         else

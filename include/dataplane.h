@@ -136,7 +136,7 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
          pkts[i]->payload = rte_pktmbuf_mtod(ms[i], char *) + 40;
          pkts[i]->size = ms[i]->data_len;
          pkts[i]->metadata = (void*)ms[i];
-         pkts[i]->queue_length = stream->queue_length + i + 1;
+         pkts[i]->queue_length = stream->queue_length + i;
      }
 
      stream->queue_length += n;
@@ -158,6 +158,7 @@ int rx_stream_release_pkts(struct rx_packet_stream *stream,
              idx = (idx >= HIST_SIZE) ? HIST_SIZE-1 : idx;
              hist[idx]++;
          }
+         stream->packet_count += n;
 
      } else {
          for (size_t i = 0; i < n; ++i) {
@@ -167,7 +168,6 @@ int rx_stream_release_pkts(struct rx_packet_stream *stream,
      }
 
      stream->queue_length -= n;
-     stream->packet_count += n;
 
      return 0;
 }
