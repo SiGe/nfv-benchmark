@@ -32,6 +32,7 @@ int datapath_init(int argc, char **, struct dataplane_port_t **);
 void datapath_teardown(struct dataplane_port_t *);
 
 struct fll_t *g_fll = 0;
+uint32_t g_npkts = 0;
 
 /* TODO:
  * Normal vs. DDOS distribution packet size distribution
@@ -45,14 +46,14 @@ int txer(void *arg) {
     uint16_t port_id = port->port_id;
     uint16_t queue_id = 0;
 
-    uint32_t packet_count = 1<<20;
+    uint32_t packet_count = 1<<24;
 
     log_info("Preparing packet pool.");
     struct packet_pool_t *pool = packets_pool_create(packet_count, PACKET_SIZE);
     log_info("Done preparation of packet pool.");
 
     // Create a zipfian distribution for source/destination ip address
-    packets_pool_zipfian(pool, 0, packet_count - 1, 26, 8, 1.1);
+    packets_pool_zipfian(pool, 0, packet_count - 1, 26, 12, 1.5);
 
     {
         packet_t *pkts[MAX_PKT_BURST] = {0};
@@ -95,10 +96,12 @@ int txer(void *arg) {
 					packet_t *pkt = pkts[idx];
 					npkts += packet_send(port, pkt);
 				}
-                // TODO: burst_size or npkts?  That's the question
-                fll_pkts_sent(fll, npkts);
+                // TODO: batch_size or npkts?  That's the question
+                fll_pkts_sent(fll, batch_size);
 
+burst_size_is_zero:
                 npkts = rte_eth_rx_burst(port_id, queue_id, rx_mbufs, RX_BURST);
+                g_npkts += npkts;
                 if (npkts != 0) {
                     for (int i = 0; i < npkts; ++i) {
                         char *hdr = rte_pktmbuf_mtod(rx_mbufs[i], char *) + 14;
@@ -113,6 +116,9 @@ int txer(void *arg) {
 
                 burst_size = fll_num_pkts_to_send(fll);
                 burst_size = (burst_size > MAX_PKT_BURST) ? MAX_PKT_BURST : burst_size;
+                if (unlikely(burst_size == 0)){
+                    goto burst_size_is_zero;
+                }
 			}
 			packets_pool_reset(pool);
 		}

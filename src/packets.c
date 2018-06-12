@@ -5,6 +5,7 @@
 #include "log.h"
 #include "memory.h"
 #include "rte_prefetch.h"
+#include "rte_malloc.h"
 #include "util.h"
 #include "zipf.h"
 
@@ -107,7 +108,7 @@ void packets_pool_zipfian(packet_pool_t *pool, uint32_t from,
     // Fill the bytestream with random values
     char *bytestream = mem_alloc(bytes * num_values);
     int *iptr = (int *)bytestream;
-    for (size_t i = 0; i < bytes/(sizeof(int)); ++i) { // Eh, ignore the last byte
+    for (size_t i = 0; i < num_values*bytes/(sizeof(int)); ++i) { // Eh, ignore the last byte
         *iptr++ = rand();
     }
 
