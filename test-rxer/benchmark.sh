@@ -35,7 +35,7 @@ for modOne in ${modules}; do
             for sizeOne in ${sizes}; do
                 for sizeTwo in ${sizes}; do
                     printf "%d\t%d\t" "$sizeOne" "$sizeTwo"
-                    ./make-pipeline.sh timer,256 measurement_large,32 $modOne,$sizeOne $modTwo,$sizeTwo drop,32 >"${LOGS}/build-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" 2>&1
+                    ./make-pipeline.sh timer,256 measurement_large,256 $modOne,$sizeOne $modTwo,$sizeTwo drop,32 >"${LOGS}/build-${modOne}-${modTwo}-${sizeOne}-${sizeTwo}-${PACKET_SIZE}.log" 2>&1
                     if [ $? -ne 0 ]; then
                         printf "FAILED\n"
                         continue

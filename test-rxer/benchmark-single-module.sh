@@ -55,6 +55,6 @@ for modOne in ${modules}; do
             else
                 printf "%s\t%s\t%s\n" "$rate" "$FLL" "$cycles"
             fi
-        done
-    done >"${RESULTS}/${modOne}-${PACKET_SIZE}-${repeat}.csv"
+        done >"${RESULTS}/${modOne}-${PACKET_SIZE}-${repeat}.csv"
+    done
 done

@@ -61,7 +61,7 @@
 #endif
 
 #ifndef MEASUREMENT_BUFFER_SIZE
-#define MEASUREMENT_BUFFER_SIZE 32
+#define MEASUREMENT_BUFFER_SIZE 256
 #endif
 
 // Histogram parameters
