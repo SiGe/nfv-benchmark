@@ -3,12 +3,19 @@
 
 #include "element.h"
 
+#undef MEASUREMENT_POPULAR
+
 struct packet_t;
 
 struct measurement_t {
     struct element_t element;
     size_t tbl_size;
     uint32_t _tmp[MEASUREMENT_BUFFER_SIZE];
+
+#ifdef MEASUREMENT_POPULAR
+    uint32_t pop_count;
+    uint32_t pop_sig[3];
+#endif
 
     uint32_t *tbl;
 };

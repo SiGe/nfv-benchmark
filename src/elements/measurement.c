@@ -26,6 +26,13 @@ struct measurement_t *measurement_create(void) {
     measurement->tbl_size = 0;
     measurement->tbl = 0;
 
+#ifdef MEASUREMENT_POPULAR
+    measurement->pop_count = 0;
+    measurement->pop_sig[0] = 1933683066;
+    measurement->pop_sig[1] = 1769104744;
+    measurement->pop_sig[2] = 265260270;
+#endif
+
     return measurement;
 }
 
@@ -77,15 +84,27 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
         }
 
         for (packet_index_t i = 0; i < idx; ++i) {
-            ip.src = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12));
-            ip.dst = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12 + 4));
-            ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
-            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
+#ifdef MEASUREMENT_POPULAR
+            if (//memcmp(pkt_ptr[i]->hdr + 14 + 12, &self->pop_sig, 12) == 0) {
+                (*((uint32_t*)(pkt_ptr[i]->hdr + 14 + 12)) == self->pop_sig[0]) &&
+                (*((uint32_t*)(pkt_ptr[i]->hdr + 14 + 16)) == self->pop_sig[1]) &&
+                (*((uint32_t*)(pkt_ptr[i]->hdr + 14 + 20)) == self->pop_sig[2])) {
+               //self->pop_count++;
+               self->_tmp[i] = 0;
+            } else {
+#endif // MEASUREMENT_POPULAR
+                ip.src = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12));
+                ip.dst = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12 + 4));
+                ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
+                ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
 
-            util_hash(&ip, sizeof(ip), &out);
-            out &= size_minus_one;
-            rte_prefetch0(self->tbl + out);
-            self->_tmp[i] = out;
+                util_hash(&ip, sizeof(ip), &out);
+                out &= size_minus_one;
+                rte_prefetch0(self->tbl + out);
+                self->_tmp[i] = out;
+#ifdef MEASUREMENT_POPULAR
+            }
+#endif // MEASUREMENT_POPULAR
         }
 
         for (packet_index_t i = 0; i < idx; ++i) {
@@ -95,7 +114,6 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
     }
 
     ELEMENT_TIME_END(pkts, size);
-
     element_dispatch(ele, 0, pkts, size);
 }
 
@@ -123,7 +141,6 @@ void measurement_process_no_prefetching(struct element_t *ele, struct packet_t *
         // Make sure that the tbl_size is a multiple of two
         self->tbl[out & size_minus_one]++;
     }
-
     element_dispatch(ele, 0, pkts, size);
 }
 
@@ -139,6 +156,10 @@ void measurement_release(struct element_t *ele) {
             total_unique += (self->tbl[i] != 0);
         }
         printf("Total unique: %d, total count: %d\n", total_unique, total_count);
+#ifdef MEASUREMENT_POPULAR
+        printf("Measurement popular: %d\n", self->pop_count);
+#endif // MEASUREMENT_POPULAR
+
         mem_release(self->tbl);
     }
     mem_release(self);

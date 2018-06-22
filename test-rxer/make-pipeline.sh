@@ -6,6 +6,13 @@ DIR="$( cd "$(dirname "$0")" ; pwd -P )"
 #----------------------------------------
 # Elements
 #----------------------------------------
+fastpass() {
+    buffer=$1
+    cat - <<EOF
+    pipeline_element_add(pipe, el_fastpass_create(MOD_BUFFER_SIZE_${buffer}, stream));
+EOF
+}
+
 checksum() {
     buffer=$1
     cat - <<EOF
@@ -119,7 +126,7 @@ benchmark_compile() {
     echo ${define_args}
     make clean
     make rxer-test PROFILE=optimized EXTRA="${define_args}"
-    #make rxer-test PROFILE=debug EXTRA="${define_args}"
+    # make rxer-test PROFILE=debug EXTRA="${define_args}"
 }
 
 usage() {

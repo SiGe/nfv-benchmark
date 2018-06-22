@@ -19,9 +19,11 @@ struct buffered_element_t *buffered_element_create(
     ele->self.disconnect = buffered_element_disconnect;
     ele->self.hop_at = buffered_element_hop_at;
 
-    // Map the buffered element ports to the element ports
-    port_t **ports = (port_t**)&element->ports;
-    *ports = (port_t*)ele->self.ports[0];
+    // If the element is already connected to some elements, remember the
+    // connectivity in the proxy, i.e., the buffered element.
+    for (int i = 0; i < ELEMENT_MAX_PORT_COUNT; ++i) {
+        ele->self.ports[i] = element->ports[i];
+    }
 
     return ele;
 }

@@ -6,23 +6,30 @@ DIR="$( cd "$(dirname "$0")" ; pwd -P )"
 #----------------------------------------
 # Elements
 #----------------------------------------
+fastpass() {
+    buffer=$1
+    cat - <<EOF
+    pipeline_element_add(pipe, el_bypass_fastpass_create(MOD_BUFFER_SIZE_${buffer}, stream));
+EOF
+}
+
 checksum() {
     buffer=$1
     cat - <<EOF
-    pipeline_element_add(pipe, el_checksum_create(MOD_BUFFER_SIZE_${buffer}));
+    pipeline_element_add(pipe, el_bypass_checksum_create(MOD_BUFFER_SIZE_${buffer}));
 EOF
 }
 
 drop() {
     cat - <<EOF
-    pipeline_element_add(pipe, el_drop_mbuf_create(MOD_BUFFER_SIZE_DROP, stream));
+    pipeline_element_add(pipe, el_bypass_drop_mbuf_create(MOD_BUFFER_SIZE_DROP, stream));
 EOF
 }
 
 timer() {
     buffer=$1
     cat - <<EOF
-    pipeline_element_add(pipe, el_timer_create(MOD_BUFFER_SIZE_${buffer}));
+    pipeline_element_add(pipe, el_bypass_timer_create(MOD_BUFFER_SIZE_${buffer}));
 EOF
 }
 
@@ -30,14 +37,14 @@ EOF
 identity() {
     buffer=$1
     cat - <<EOF
-    pipeline_element_add(pipe, el_identity_create(MOD_BUFFER_SIZE_${buffer}));
+    pipeline_element_add(pipe, el_bypass_identity_create(MOD_BUFFER_SIZE_${buffer}));
 EOF
 }
 
 measurement_large() {
     buffer=$1
     cat - <<EOF
-    pipeline_element_add(pipe, el_measurement_create_with_size(MOD_BUFFER_SIZE_${buffer}, 
+    pipeline_element_add(pipe, el_bypass_measurement_create_with_size(MOD_BUFFER_SIZE_${buffer}, 
         1 << 24));
 EOF
 }
@@ -45,7 +52,7 @@ EOF
 routing_stanford() {
     buffer=$1
     cat - <<EOF
-    pipeline_element_add(pipe, el_routing_create_with_file(MOD_BUFFER_SIZE_${buffer}, 
+    pipeline_element_add(pipe, el_bypass_routing_create_with_file(MOD_BUFFER_SIZE_${buffer}, 
         "data/boza_rtr_route.lpm"));
 EOF
 }

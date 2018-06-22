@@ -132,10 +132,12 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
          rte_exit(EXIT_FAILURE, "Failed to dequeue enough packets slots.");
 
      for (unsigned int i = 0; i < n; ++i) {
-         pkts[i]->hdr = rte_pktmbuf_mtod(ms[i], char *);
-         pkts[i]->payload = rte_pktmbuf_mtod(ms[i], char *) + 40;
-         pkts[i]->size = ms[i]->data_len;
-         pkts[i]->metadata = (void*)ms[i];
+         const struct rte_mbuf *mss = ms[i];
+         const char *pkt = rte_pktmbuf_mtod(mss, char *);
+         pkts[i]->hdr = pkt;
+         pkts[i]->payload = pkt + 40;
+         pkts[i]->size = mss->data_len;
+         pkts[i]->metadata = (void*)mss;
          pkts[i]->queue_length = stream->queue_length + i;
      }
 

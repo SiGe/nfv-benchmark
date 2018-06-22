@@ -2,6 +2,7 @@
 #define _ELEMENTS_CHECKSUM_H_
 
 #include "element.h"
+#include "rte_prefetch.h"
 
 struct packet_t;
 

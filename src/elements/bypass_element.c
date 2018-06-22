@@ -6,7 +6,6 @@ struct bypass_element_t *bypass_element_create(struct element_t *element, packet
     size_t ele_size = sizeof(struct bypass_element_t);
     struct bypass_element_t *ele = mem_alloc(ele_size);
 
-    ele->size = 0;
     ele->element = element;
     ele->notify_size  = notify_size;
 
@@ -17,9 +16,11 @@ struct bypass_element_t *bypass_element_create(struct element_t *element, packet
     ele->self.disconnect = bypass_element_disconnect;
     ele->self.hop_at = bypass_element_hop_at;
 
-    // Map the bypass element ports to the element ports
-    port_t **ports = (port_t**)&element->ports;
-    *ports = (port_t*)ele->self.ports[0];
+    // If the element is already connected to some elements, remember the
+    // connectivity in the proxy, i.e., the buffered element.
+    for (int i = 0; i < ELEMENT_MAX_PORT_COUNT; ++i) {
+        ele->self.ports[i] = element->ports[i];
+    }
 
     return ele;
 }

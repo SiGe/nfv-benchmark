@@ -5,6 +5,7 @@
 #include "elements/checksum.h"
 #include "elements/drop.h"
 #include "elements/drop_mbuf.h"
+#include "elements/fastpass.h"
 #include "elements/identity.h"
 #include "elements/measurement.h"
 #include "elements/routing.h"
@@ -15,6 +16,17 @@
 //----------------------------------------
 // Elements setup and creation
 //----------------------------------------
+struct element_t *el_only_fastpass_create(struct rx_packet_stream* stream) {
+    struct element_t *el = (struct element_t*)fastpass_create(
+        1933683066, 1769104744, 265260270);
+    struct drop_mbuf_t *drop = el_only_drop_mbuf_create(stream);
+
+    // attach a drop_mbuf to port/1
+    el->connect(el, 1, (element_t *)drop);
+
+    return el;
+}
+
 struct element_t *el_only_identity_create(void) {
     return (struct element_t*)identity_create();
 }
@@ -104,51 +116,61 @@ inline struct element_t *el_drop_mbuf_create(
             (struct element_t*)el_only_drop_mbuf_create(stream), size);
 }
 
-inline struct element_t *el_timer_create(packet_index_t size) {
+inline struct element_t *el_fastpass_create(
+        packet_index_t size, struct rx_packet_stream* stream) {
     return (struct element_t *)buffered_element_create(
-            (struct element_t*)el_only_timer_create(), size);
+            (struct element_t*)el_only_fastpass_create(stream), size);
 }
+
 
 //----------------------------------------
 // Bypass elements creation
 //----------------------------------------
-inline struct element_t *el_identity_create(packet_index_t size) {
+inline struct element_t *el_bypass_timer_create(packet_index_t size) {
+    return (struct element_t *)buffered_element_create(
+            (struct element_t*)el_only_timer_create(), size);
+}
+
+inline struct element_t *el_bypass_identity_create(packet_index_t size) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_identity_create(), size);
 }
 
-inline struct element_t *el_drop_create(packet_index_t size) {
+inline struct element_t *el_bypass_drop_create(packet_index_t size) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_drop_create(), size);
 }
 
-inline struct element_t *el_checksum_create(packet_index_t size) {
+inline struct element_t *el_bypass_checksum_create(packet_index_t size) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_checksum_create(), size);
 }
 
-inline struct element_t *el_routing_create(packet_index_t size) {
+inline struct element_t *el_bypass_routing_create(packet_index_t size) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_routing_create(), size);
 }
 
-inline struct element_t *el_routing_create_with_file(
+inline struct element_t *el_bypass_routing_create_with_file(
         packet_index_t size, char const *fname) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_routing_create_with_file(fname), size);
 }
 
-inline struct element_t *el_measurement_create_with_size(
+inline struct element_t *el_bypass_measurement_create_with_size(
         packet_index_t size, size_t tbl_size) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_measurement_create_with_size(tbl_size), size);
 }
 
-inline struct element_t *el_drop_mbuf_create(
+inline struct element_t *el_bypass_drop_mbuf_create(
         packet_index_t size, struct rx_packet_stream* stream) {
     return (struct element_t *)bypass_element_create(
             (struct element_t*)el_only_drop_mbuf_create(stream), size);
 }
 
-
-
+inline struct element_t *el_bypass_fastpass_create(
+        packet_index_t size, struct rx_packet_stream* stream) {
+    return (struct element_t *)bypass_element_create(
+            (struct element_t*)el_only_fastpass_create(stream), size);
+}

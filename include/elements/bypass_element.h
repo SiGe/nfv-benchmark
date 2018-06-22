@@ -20,8 +20,4 @@ void bypass_element_connect(element_t *self, port_index_t, element_t*);
 void bypass_element_disconnect(element_t *self, port_index_t);
 element_t *bypass_element_hop_at(element_t *self, port_index_t);
 
-static inline void bypass_element_add(struct bypass_element_t *buf, packet_t* pkt) {
-    buf->buffer[buf->size++] = pkt;
-}
-
 #endif // _BYPASS_H_

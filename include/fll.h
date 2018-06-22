@@ -20,7 +20,7 @@
  */
 
 #define FLL_MAGIC    (0xbeed5335)
-#define FLL_WND_SIZE (1<<12)
+#define FLL_WND_SIZE (1<<14)
 
 #define FLL(pkt) ((struct fll_packet_t*)(pkt))
 

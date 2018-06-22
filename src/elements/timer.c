@@ -1,3 +1,5 @@
+#include "rte_prefetch.h"
+
 #include "memory.h"
 #include "element.h"
 #include "elements/timer.h"
@@ -19,6 +21,8 @@ void timer_process(struct element_t *ele, struct packet_t **pkts, packet_index_t
     uint64_t time = rte_get_tsc_cycles();
     for (int i = 0; i < size; ++i) {
         pkts[i]->arrival = time;
+        //rte_prefetch0(pkts[i]->hdr);
+        //rte_prefetch0(pkts[i]->hdr+26);
     }
     element_dispatch(ele, 0, pkts, size);
 }

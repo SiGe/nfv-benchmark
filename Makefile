@@ -14,8 +14,8 @@ DPDK_LDFLAGS=-L$(DPDK_ROOT)/lib -Wl,-lrte_flow_classify -Wl,-lrte_pipeline -Wl,-
 
 # CFLAGS generation
 CFLAGS_BASE = -I include/ -I lib/ -Itest-rxer/ -lm $(DPDK_CFLAGS) -fdiagnostics-color
-CFLAGS_OPT = $(CFLAGS_BASE) -O3 -ffunction-sections -fdata-sections -fPIC
-CFLAGS_DEBUG = $(CFLAGS_BASE) -O0 -pg -g -fPIC
+CFLAGS_OPT = $(CFLAGS_BASE) -O3 -ffunction-sections -fdata-sections -fPIC -ggdb -fno-omit-frame-pointer
+CFLAGS_DEBUG = $(CFLAGS_BASE) -O0 -pg -ggdb -fPIC
 
 # LDFLAGS generation
 LDFLAGS+=$(DPDK_LDFLAGS) -lm -lrt -lnuma -lpcap -fPIC

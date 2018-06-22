@@ -40,7 +40,7 @@ void benchmark_loop(struct dataplane_port_t *port,
               struct pipeline_t *pipe, 
               struct rx_packet_stream *stream,
               uint16_t record_time,
-              uint32_t num_packets) {
+              uint64_t num_packets) {
     const uint16_t port_id = port->port_id;
     const uint16_t queue_id = port->queue_id;
     uint16_t npkts = 0;
@@ -97,7 +97,7 @@ void benchmark_loop(struct dataplane_port_t *port,
         packet_send(port, fll_pkt);
         rte_eth_tx_buffer_flush(port->port_id, port->queue_id, port->tx_buffer);
 
-        if (unlikely(packet_count > num_packets))
+        if (unlikely(record_time == 0 && packet_count > num_packets))
             break;
     }
 
@@ -150,7 +150,7 @@ int rxer(void *arg) {
     benchmark_loop(port, pipe, stream, 0, 1<<24);
 
     // Benchmark loop
-    benchmark_loop(port, pipe, stream, 1, 1<<27);
+    benchmark_loop(port, pipe, stream, 1, 1<<30);
 
     /* Clean up whatever junk that remains */
     pipeline_release(pipe);
