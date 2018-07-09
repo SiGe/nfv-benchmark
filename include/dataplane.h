@@ -91,7 +91,7 @@ struct rx_packet_stream {
     struct rte_ring *ring;
     struct packet_t *pkts;
     int size;
-    uint16_t queue_length;
+    int queue_length;
     uint32_t tmp;
 
     uint64_t average_queue_length;
@@ -156,7 +156,7 @@ int rx_stream_release_pkts(struct rx_packet_stream *stream,
              rte_pktmbuf_free((struct rte_mbuf*)pkts[i]->metadata);
              rte_ring_sp_enqueue(stream->ring, pkts[i]);
              stream->average_queue_length += pkts[i]->queue_length;
-             idx = ((time - pkts[i]->arrival) / pkts[i]->queue_length);
+             idx = ((time - pkts[i]->arrival) / (pkts[i]->queue_length + 1));
              idx = (idx >= HIST_SIZE) ? HIST_SIZE-1 : idx;
              hist[idx]++;
          }
@@ -170,6 +170,7 @@ int rx_stream_release_pkts(struct rx_packet_stream *stream,
      }
 
      stream->queue_length -= n;
+     assert(stream->queue_length >= 0);
 
      return 0;
 }

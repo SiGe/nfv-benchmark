@@ -8,6 +8,8 @@
 #include "elements/fastpass.h"
 #include "elements/identity.h"
 #include "elements/measurement.h"
+#include "elements/merged.h"
+#include "elements/merged_fastpass.h"
 #include "elements/routing.h"
 #include "elements/timer.h"
 
@@ -16,6 +18,23 @@
 //----------------------------------------
 // Elements setup and creation
 //----------------------------------------
+struct element_t *el_only_merged_fastpass_create(char const *fname, size_t __attribute__((unused)) tbl_size) {
+    struct merged_fastpass_t *merged= merged_fastpass_create(
+        1933683066, 1769104744, 265260270);
+    struct routing_t *router = (struct routing_t *)merged;
+    routing_file_load(router, fname);
+
+    return (struct element_t *)merged;
+}
+
+struct element_t *el_only_merged_create(char const *fname, size_t __attribute__((unused)) tbl_size) {
+    struct merged_t *merged= merged_create();
+    struct routing_t *router = (struct routing_t *)merged;
+    routing_file_load(router, fname);
+
+    return (struct element_t *)merged;
+}
+
 struct element_t *el_only_fastpass_create(struct rx_packet_stream* stream) {
     struct element_t *el = (struct element_t*)fastpass_create(
         1933683066, 1769104744, 265260270);
@@ -73,6 +92,16 @@ inline struct element_t *el_only_drop_mbuf_create(struct rx_packet_stream* strea
 //----------------------------------------
 // Buffered elements creation
 //----------------------------------------
+inline struct element_t *el_merged_fastpass_create(packet_index_t size, char const *fname, size_t tbl_size) {
+    return (struct element_t *)buffered_element_create(
+            (struct element_t*)el_only_merged_fastpass_create(fname, tbl_size), size);
+}
+
+inline struct element_t *el_merged_create(packet_index_t size, char const *fname, size_t tbl_size) {
+    return (struct element_t *)buffered_element_create(
+            (struct element_t*)el_only_merged_create(fname, tbl_size), size);
+}
+
 inline struct element_t *el_timer_create(packet_index_t size) {
     return (struct element_t *)buffered_element_create(
             (struct element_t*)el_only_timer_create(), size);
@@ -126,6 +155,16 @@ inline struct element_t *el_fastpass_create(
 //----------------------------------------
 // Bypass elements creation
 //----------------------------------------
+struct element_t *el_bypass_merged_fastpass_create(packet_index_t size, char const *fname, size_t tbl_size) {
+    return (struct element_t *)bypass_element_create(
+            (struct element_t*)el_only_merged_fastpass_create(fname, tbl_size), size);
+}
+
+struct element_t *el_bypass_merged_create(packet_index_t size, char const *fname, size_t tbl_size) {
+    return (struct element_t *)bypass_element_create(
+            (struct element_t*)el_only_merged_create(fname, tbl_size), size);
+}
+
 inline struct element_t *el_bypass_timer_create(packet_index_t size) {
     return (struct element_t *)buffered_element_create(
             (struct element_t*)el_only_timer_create(), size);

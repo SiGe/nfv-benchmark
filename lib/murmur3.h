@@ -22,6 +22,10 @@ void MurmurHash3_x64_128(const void *key, int len, uint32_t seed, void *out);
 
 //-----------------------------------------------------------------------------
 
+// Return hash result
+uint32_t MurmurHash3_x86_32_ret (const void *key, int len, uint32_t seed);
+
+
 #ifdef __cplusplus
 }
 #endif

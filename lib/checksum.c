@@ -1,3 +1,4 @@
+#include "rte_branch_prediction.h"
 #include "rte_prefetch.h"
 
 #include "checksum.h"
@@ -11,7 +12,7 @@ unsigned short checksum(const char *buf, unsigned size) {
 
 	while (size >= sizeof(unsigned long long))
 	{
-        rte_prefetch0(b+128);
+        //rte_prefetch0(b+128);
         unsigned long long s = *b++;
         sum += s;
         if (sum < s) sum++;

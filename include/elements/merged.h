@@ -1,6 +1,7 @@
 #ifndef _ELEMENTS_MERGED_H_
 #define _ELEMENTS_MERGED_H_
 
+#include "elements/routing.h"
 #include "element.h"
 
 struct packet_t;
@@ -8,7 +9,7 @@ struct packet_t;
 struct merged_t {
     /* This block should match routing_t's structure */
     struct element_t element;
-    uint64_t _tmp;
+    uint64_t _tmp_2;
     struct _routing_tbl_256_t fst_tbl;
     /* until here */
 
@@ -18,6 +19,8 @@ struct merged_t {
     uint32_t *tbl;
 
     // Checksum
+    uint64_t checksum_count;
+    uint64_t port_count;
 };
 
 struct merged_t *merged_create(void);

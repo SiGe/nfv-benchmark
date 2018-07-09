@@ -56,7 +56,7 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
             ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
             ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
 
-            util_hash(&ip, sizeof(ip), &out);
+            out = util_hash_ret(&ip, sizeof(ip));
             out &= size_minus_one;
             rte_prefetch0(self->tbl + out);
             self->_tmp[i] = out;
@@ -82,7 +82,7 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
             ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
             ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
 
-            util_hash(&ip, sizeof(ip), &out);
+            out = util_hash_ret(&ip, sizeof(ip));
             out &= size_minus_one;
             rte_prefetch0(self->tbl + out);
             self->_tmp[i] = out;
@@ -117,7 +117,7 @@ void measurement_process_no_prefetching(struct element_t *ele, struct packet_t *
         ip.src_port = *((uint16_t*)(pkts[i]->hdr+ 14 + 20 + 0));
         ip.dst_port = *((uint16_t*)(pkts[i]->hdr+ 14 + 20 + 2));
 
-        util_hash(&ip, sizeof(ip), &out);
+        out = util_hash_ret(&ip, sizeof(ip));
 
         // Make sure that the tbl_size is a multiple of two
         self->tbl[out & size_minus_one]++;

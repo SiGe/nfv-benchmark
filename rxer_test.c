@@ -41,6 +41,8 @@ void benchmark_loop(struct dataplane_port_t *port,
               struct rx_packet_stream *stream,
               uint16_t record_time,
               uint64_t num_packets) {
+    if (num_packets == 0) return;
+
     const uint16_t port_id = port->port_id;
     const uint16_t queue_id = port->queue_id;
     uint16_t npkts = 0;
@@ -148,9 +150,10 @@ int rxer(void *arg) {
     /* Run the benchmark */
     // Warmup loop
     benchmark_loop(port, pipe, stream, 0, 1<<24);
+    //benchmark_loop(port, pipe, stream, 0, 0);
 
     // Benchmark loop
-    benchmark_loop(port, pipe, stream, 1, 1<<30);
+    benchmark_loop(port, pipe, stream, 1, 1<<27);
 
     /* Clean up whatever junk that remains */
     pipeline_release(pipe);
@@ -216,8 +219,15 @@ int main(int argc, char **argv) {
         rte_delay_ms(CONSOLE_FREQ);
         if (console_status == CONSOLE_PRINT) {
             printf("\e[1;1H\e[2J");
-            if (g_stream)
-                printf("Average queue_length %.2f\n",  (double)(g_stream->average_queue_length) / (g_stream->packet_count+1));
+            if (g_stream) {
+                struct rx_packet_stream *st = g_stream;
+                printf("Average queue_length %.2f\n",  (double)(st->average_queue_length) / (st->packet_count+1));
+                // printf("Ring size: %d out of %d\n", 
+                //         rte_ring_get_capacity(st->ring) - rte_ring_free_count(st->ring), 
+                //         rte_ring_get_capacity(st->ring));
+                // printf("Instantaenous queue length %d\n", 
+                //        st->queue_length);
+            }
 
             if (g_fll) {
                 printf("FLL Stats: \n");

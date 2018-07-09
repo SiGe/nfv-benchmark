@@ -8,6 +8,7 @@
 #define UTIL_SEED 43975688
 
 #define util_hash(key, len, out) MurmurHash3_x86_32(key, len, UTIL_SEED, out)
+#define util_hash_ret(key, len) MurmurHash3_x86_32_ret(key, len, UTIL_SEED)
 
 #define ALIGN(size, to) ((size + ((1<<to) - 1)) & (-1 ^ ((1<<to) - 1)));
 

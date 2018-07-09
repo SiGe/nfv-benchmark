@@ -51,8 +51,9 @@ void fastpass_process(struct element_t *ele, struct packet_t **pkts, packet_inde
         p[j] = pkts[j];
     }
 
-    for (int i = PREFETCH_SIZE_HALF; i < size; i += PREFETCH_SIZE_HALF) {
-        for (int j = 0; j < PREFETCH_SIZE_HALF; ++j) {
+    int i = PREFETCH_SIZE_HALF;
+    for (; i < size - PREFETCH_SIZE_HALF; i += PREFETCH_SIZE_HALF) {
+        for (int j = 0; j < PREFETCH_SIZE_HALF && i + j < size; ++j) {
             p[j+PREFETCH_SIZE_HALF] = pkts[i+j];
             rte_prefetch0(p[j+PREFETCH_SIZE_HALF]->hdr + 26);
         }
@@ -74,11 +75,12 @@ void fastpass_process(struct element_t *ele, struct packet_t **pkts, packet_inde
         }
     }
 
-    for (int j = 0; j < PREFETCH_SIZE_HALF; ++j) {
-        self->fast[fast++] = self->slow[slow++] = p[j];
-        uint32_t is_fast = (*((uint32_t*)(p[j]->hdr + 14 + 16)) == b) &&
-                           (*((uint32_t*)(p[j]->hdr + 14 + 20)) == c) &&
-                           (*((uint32_t*)(p[j]->hdr + 14 + 12)) == a);
+    i -= PREFETCH_SIZE_HALF;
+    for (int j = i; j < size; ++j) {
+        self->fast[fast++] = self->slow[slow++] = pkts[j];
+        uint32_t is_fast = (*((uint32_t*)(pkts[j]->hdr + 14 + 16)) == b) &&
+                           (*((uint32_t*)(pkts[j]->hdr + 14 + 20)) == c) &&
+                           (*((uint32_t*)(pkts[j]->hdr + 14 + 12)) == a);
 
         self->count += is_fast;
         self->port  += (is_fast & self->port);

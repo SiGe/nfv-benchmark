@@ -57,6 +57,22 @@ routing_stanford() {
 EOF
 }
 
+merged() {
+    buffer=$1
+    cat - <<EOF
+    pipeline_element_add(pipe, el_bypass_merged_create(MOD_BUFFER_SIZE_${buffer}, 
+        "data/boza_rtr_route.lpm", 1 << 24));
+EOF
+}
+
+merged_fastpass() {
+    buffer=$1
+    cat - <<EOF
+    pipeline_element_add(pipe, el_bypass_merged_fastpass_create(MOD_BUFFER_SIZE_${buffer}, 
+        "data/boza_rtr_route.lpm", 1 << 24));
+EOF
+}
+
 #----------------------------------------
 # Benchmark
 #----------------------------------------
