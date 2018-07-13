@@ -13,9 +13,9 @@
 
 #include "elements/merged_fastpass.h"
 
-#define MPF_SIZE 32
+#define MPF_SIZE 16
 #define MPF_SIZE_HALF (MPF_SIZE >> 1)
-#define MPF_TBL_SIZE (1<<24)
+#define MPF_TBL_SIZE (1<<18)
 
 struct merged_fastpass_t *merged_fastpass_create(uint32_t a, uint32_t b, uint32_t c) {
     struct merged_fastpass_t *merged = (struct merged_fastpass_t *)mem_alloc(sizeof(struct merged_fastpass_t));
@@ -42,6 +42,7 @@ struct merged_fastpass_t *merged_fastpass_create(uint32_t a, uint32_t b, uint32_
     merged->a = a;
     merged->b = b;
     merged->c = c;
+    merged->_tmp_2 = 0;
 
     return merged;
 }
@@ -70,6 +71,7 @@ void merged_fastpass_process(struct element_t *ele, struct packet_t **pkts, pack
     }
 
     uint32_t a, b, c;
+    uint32_t fastpass_count = 0;
     a = self->a; b = self->b; c = self->c;
 
     int i = MPF_SIZE_HALF;
@@ -86,13 +88,15 @@ void merged_fastpass_process(struct element_t *ele, struct packet_t **pkts, pack
             ip.dst = *((ipv4_t*)(pkt->hdr+ 14 + 12 + 4));
             ip.srcdst_port = *((uint32_t*)(pkt->hdr+ 14 + 12 + 8));
 
-            uint32_t is_fast = (ip.src == b) &&
-                               (ip.dst == a) &&
+            uint32_t is_fast = (ip.dst == b) &&
+                               (ip.src == a) &&
                                (ip.srcdst_port == c);
+            fastpass_count += is_fast;
             register uint32_t out = 0;
             if (!is_fast) {
                 out = util_hash_ret(&ip, sizeof(ip));
                 out &= ((MPF_TBL_SIZE) - 1);
+                //rte_prefetch0(self->tbl + out);
 
                 struct _routing_tbl_entry_t *ent = routing_entry_find(self, ip.dst);
                 if (ent) {
@@ -100,7 +104,6 @@ void merged_fastpass_process(struct element_t *ele, struct packet_t **pkts, pack
                     ent->count ++;
                 }
             }
-            rte_prefetch0(self->tbl + out);
             hashes[j] = out;
             self->checksum_count += checksum(pkt->hdr, pkt->size);
         }
@@ -118,13 +121,15 @@ void merged_fastpass_process(struct element_t *ele, struct packet_t **pkts, pack
         ip.dst = *((ipv4_t*)(pkt->hdr+ 14 + 12 + 4));
         ip.srcdst_port = *((uint32_t*)(pkt->hdr+ 14 + 12 + 8));
 
-        uint32_t is_fast = (ip.src == b) &&
-                           (ip.dst == a) &&
+        uint32_t is_fast = (ip.dst == b) &&
+                           (ip.src == a) &&
                            (ip.srcdst_port == c);
         register uint32_t out = 0;
+        fastpass_count += is_fast;
         if (!is_fast) {
             out = util_hash_ret(&ip, sizeof(ip));
             out &= ((MPF_TBL_SIZE) - 1);
+            //rte_prefetch0(self->tbl + out);
 
             struct _routing_tbl_entry_t *ent = routing_entry_find(self, ip.dst);
             if (ent) {
@@ -132,7 +137,6 @@ void merged_fastpass_process(struct element_t *ele, struct packet_t **pkts, pack
                 ent->count ++;
             }
         }
-        rte_prefetch0(self->tbl + out);
         hashes[j - i] = out;
         self->checksum_count += checksum(pkt->hdr, pkt->size);
     }
@@ -140,7 +144,7 @@ void merged_fastpass_process(struct element_t *ele, struct packet_t **pkts, pack
     for (int j = i; j < size; ++j) {
         self->tbl[hashes[j - i]]++;
     }
-
+    self->_tmp_2 += fastpass_count;
     element_dispatch(ele, 0, pkts, size);
 }
 
@@ -152,6 +156,7 @@ void merged_fastpass_release(struct element_t *ele) {
         total += self->tbl[i];
     }
     printf("Total number of packets processed: %llu\n", total);
+    printf("Total number of fastpass packets: %llu\n", self->_tmp_2);
 
     if (self->tbl) {
         mem_release(self->tbl);
