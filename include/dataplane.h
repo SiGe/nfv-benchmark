@@ -10,13 +10,6 @@
 #include "rte_malloc.h"
 #include "log.h"
 
-#define RX_DESC 1024
-#define TX_DESC 1024
-#define MEMPOOL_CACHE_SIZE 256
-#define MAX_PKT_BURST 256
-#define TX_ELE_SIZE 2048
-#define TX_POOL_SIZE (MAX_PKT_BURST * TX_ELE_SIZE)
-
 extern int g_record_time;
 
 struct dataplane_port_t {
@@ -133,7 +126,7 @@ int rx_stream_mtop(struct rx_packet_stream *stream,
 
      for (unsigned int i = 0; i < n; ++i) {
          const struct rte_mbuf *mss = ms[i];
-         const char *pkt = rte_pktmbuf_mtod(mss, char *);
+         char *pkt = rte_pktmbuf_mtod(mss, char *);
          pkts[i]->hdr = pkt;
          pkts[i]->payload = pkt + 40;
          pkts[i]->size = mss->data_len;
@@ -153,10 +146,11 @@ int rx_stream_release_pkts(struct rx_packet_stream *stream,
      if (g_record_time) {
          uint64_t time = rte_get_tsc_cycles();
          for (size_t i = 0; i < n; ++i) {
-             rte_pktmbuf_free((struct rte_mbuf*)pkts[i]->metadata);
-             rte_ring_sp_enqueue(stream->ring, pkts[i]);
-             stream->average_queue_length += pkts[i]->queue_length;
-             idx = ((time - pkts[i]->arrival) / (pkts[i]->queue_length + 1));
+             struct packet_t *pkt = pkts[i];
+             rte_pktmbuf_free((struct rte_mbuf*)pkt->metadata);
+             rte_ring_sp_enqueue(stream->ring, pkt);
+             stream->average_queue_length += pkt->queue_length;
+             idx = ((time - pkt->arrival)) >> 4;// / (pkt->queue_length + 1));
              idx = (idx >= HIST_SIZE) ? HIST_SIZE-1 : idx;
              hist[idx]++;
          }

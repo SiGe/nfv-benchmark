@@ -8,6 +8,14 @@
 
 #include "elements/measurement.h"
 
+#define MM_SIZE 16
+#define MM_SIZE_HALF (MM_SIZE >> 1)
+#define MM_PREFETCH
+#define MM_PREFETCH_INST
+
+//undef MM_PREFETCH
+#undef MM_PREFETCH_INST
+
 void measurement_resize(struct measurement_t *self, size_t size) {
     size = ge_pow2_64(size);
     self->tbl_size = size;
@@ -31,70 +39,105 @@ struct measurement_t *measurement_create(void) {
 
 void measurement_process_prefetching(struct element_t *ele, struct packet_t **pkts, packet_index_t size) {
     struct measurement_t *self = (struct measurement_t *)ele;
+    struct packet_t *pkt;
+    struct packet_t *p[MM_SIZE];
+    uint32_t hashes[MM_SIZE_HALF];
     struct __attribute__((packed)) {
         ipv4_t src;
         ipv4_t dst;
-        uint16_t src_port;
-        uint16_t dst_port;
+        union {
+            struct __attribute__((packed)) {
+                uint16_t src;
+                uint16_t dst;
+            } ports;
+            uint32_t srcdst_port;
+        };
     } ip;
 
-    packet_index_t idx = size;
     uint32_t out;
-    size_t size_minus_one = self->tbl_size - 1;
-    struct packet_t **pkt_ptr = pkts;
 
-    ELEMENT_TIME_START(pkts, size);
-
-    while (idx > MEASUREMENT_BUFFER_SIZE) {
-        for (packet_index_t i = 0; i < MEASUREMENT_BUFFER_SIZE; ++i) {
-            rte_prefetch0(pkt_ptr[i]->hdr + 26);
-        }
-
-        for (packet_index_t i = 0; i < MEASUREMENT_BUFFER_SIZE; ++i) {
-            ip.src = *((ipv4_t*)(pkt_ptr[i]->hdr + 14 + 12));
-            ip.dst = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12 + 4));
-            ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
-            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
-
-            out = util_hash_ret(&ip, sizeof(ip));
-            out &= size_minus_one;
-            rte_prefetch0(self->tbl + out);
-            self->_tmp[i] = out;
-        }
-
-        for (packet_index_t i = 0; i < MEASUREMENT_BUFFER_SIZE; ++i) {
-            // Make sure that the tbl_size is a multiple of two
-            self->tbl[self->_tmp[i]]++;
-        }
-
-        idx -= MEASUREMENT_BUFFER_SIZE;
-        pkt_ptr += MEASUREMENT_BUFFER_SIZE;
+    for (int j = 0; j < MM_SIZE_HALF; ++j) {
+        p[j] = pkts[j];
+        rte_prefetch0(p[j]->hdr + 26);
     }
 
-    if (idx > 0) {
-        for (packet_index_t i = 0; i < idx; ++i) {
-            rte_prefetch0(pkt_ptr[i]->hdr + 26);
+    int i = MM_SIZE_HALF;
+    size_t ss = self->tbl_size - 1;
+    for (;i < size - MM_SIZE_HALF; i += MM_SIZE_HALF) {
+        for (int j = 0; j < MM_SIZE_HALF && i + j < size; ++j) {
+            p[j + MM_SIZE_HALF] = pkts[i + j];
+            // Prefetch the next set of packets
+            rte_prefetch0(p[j + MM_SIZE_HALF]->hdr + 26);
         }
 
-        for (packet_index_t i = 0; i < idx; ++i) {
-            ip.src = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12));
-            ip.dst = *((ipv4_t*)(pkt_ptr[i]->hdr+ 14 + 12 + 4));
-            ip.src_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 0));
-            ip.dst_port = *((uint16_t*)(pkt_ptr[i]->hdr+ 14 + 20 + 2));
+#ifdef MM_PREFETCH
+        for (int j = 0; j < MM_SIZE_HALF; ++j) {
+            pkt = p[j];
+            ip.src = *((ipv4_t*)(pkt->hdr+ 14 + 12));
+            ip.dst = *((ipv4_t*)(pkt->hdr+ 14 + 12 + 4));
+            ip.ports.src = *((uint16_t*)(pkt->hdr+ 14 + 12 + 8));
+            ip.ports.dst = *((uint16_t*)(pkt->hdr+ 14 + 12 + 10));
 
             out = util_hash_ret(&ip, sizeof(ip));
-            out &= size_minus_one;
+            out &= ss;
+            hashes[j] = out;
+#ifdef MM_PREFETCH_INST
             rte_prefetch0(self->tbl + out);
-            self->_tmp[i] = out;
+#endif
         }
 
-        for (packet_index_t i = 0; i < idx; ++i) {
-            // Make sure that the tbl_idx is a multiple of two
-            self->tbl[self->_tmp[i]]++;
+        for (int j = 0; j < MM_SIZE_HALF; ++j) {
+            self->tbl[hashes[j]]++;
+            p[j] = p[j + MM_SIZE_HALF];
         }
+#else
+        for (int j = 0; j < MM_SIZE_HALF; ++j) {
+            pkt = p[j];
+            ip.src = *((ipv4_t*)(pkt->hdr+ 14 + 12));
+            ip.dst = *((ipv4_t*)(pkt->hdr+ 14 + 12 + 4));
+            ip.ports.src = *((uint16_t*)(pkt->hdr+ 14 + 12 + 8));
+            ip.ports.dst = *((uint16_t*)(pkt->hdr+ 14 + 12 + 10));
+
+            out = util_hash_ret(&ip, sizeof(ip));
+            out &= ss;
+            self->tbl[out]++;
+            p[j] = p[j + MM_SIZE_HALF];
+        }
+#endif //MM_PREFETCH
     }
 
-    ELEMENT_TIME_END(pkts, size);
+    i -= MM_SIZE_HALF;
+#ifdef MM_PREFETCH
+    for (int j = i; j < size; ++j) {
+        pkt = pkts[j];
+        ip.src = *((ipv4_t*)(pkt->hdr+ 14 + 12));
+        ip.dst = *((ipv4_t*)(pkt->hdr+ 14 + 12 + 4));
+        ip.srcdst_port = *((uint32_t*)(pkt->hdr+ 14 + 12 + 8));
+
+        out = util_hash_ret(&ip, sizeof(ip));
+        out &= ss;
+        hashes[j - i] = out;
+#ifdef MM_PREFETCH_INST
+        rte_prefetch0(self->tbl + out);
+#endif //MM_PREFETCH_INST
+    }
+
+    for (int j = i; j < size; ++j) {
+        self->tbl[hashes[j - i]]++;
+    }
+#else
+    for (int j = i; j < size; ++j) {
+        pkt = pkts[j];
+        ip.src = *((ipv4_t*)(pkt->hdr+ 14 + 12));
+        ip.dst = *((ipv4_t*)(pkt->hdr+ 14 + 12 + 4));
+        ip.srcdst_port = *((uint32_t*)(pkt->hdr+ 14 + 12 + 8));
+
+        out = util_hash_ret(&ip, sizeof(ip));
+        out &= ss;
+        self->tbl[out]++;
+    }
+#endif
+
     element_dispatch(ele, 0, pkts, size);
 }
 

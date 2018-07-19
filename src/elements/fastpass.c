@@ -49,25 +49,31 @@ void fastpass_process(struct element_t *ele, struct packet_t **pkts, packet_inde
     struct packet_t *p[PREFETCH_SIZE];
     for (int j = 0; j < PREFETCH_SIZE_HALF; ++j) {
         p[j] = pkts[j];
+        rte_prefetch0(p[j]->hdr);
     }
 
     int i = PREFETCH_SIZE_HALF;
     for (; i < size - PREFETCH_SIZE_HALF; i += PREFETCH_SIZE_HALF) {
         for (int j = 0; j < PREFETCH_SIZE_HALF && i + j < size; ++j) {
             p[j+PREFETCH_SIZE_HALF] = pkts[i+j];
-            rte_prefetch0(p[j+PREFETCH_SIZE_HALF]->hdr + 26);
+            rte_prefetch0(p[j+PREFETCH_SIZE_HALF]->hdr);
         }
 
         for (int j = 0; j < PREFETCH_SIZE_HALF; ++j) {
-            self->fast[fast++] = self->slow[slow++] = p[j];
-            uint32_t is_fast = (*((uint32_t*)(p[j]->hdr + 14 + 16)) == b) &&
-                               (*((uint32_t*)(p[j]->hdr + 14 + 12)) == a) &&
-                               (*((uint32_t*)(p[j]->hdr + 14 + 20)) == c);
+            struct packet_t *pkt = p[j];
+            char const *hdr = pkt->hdr;
+            self->fast[fast++] = self->slow[slow++] = pkt;
+            uint32_t is_fast = (*((uint32_t*)(hdr + 14 + 16)) ^ b) |
+                               (*((uint32_t*)(hdr + 14 + 12)) ^ a) |
+                               (*((uint32_t*)(hdr + 14 + 20)) ^ c);
 
+            is_fast = (is_fast == 0);
             self->count += is_fast;
             self->port  += (is_fast & self->port);
             fast -= (1 - is_fast);
             slow -= is_fast;
+
+            self->checksum_count += checksum(pkt->hdr, pkt->size);
         }
 
         for (int j = 0; j < PREFETCH_SIZE_HALF; ++j) {
@@ -77,19 +83,19 @@ void fastpass_process(struct element_t *ele, struct packet_t **pkts, packet_inde
 
     i -= PREFETCH_SIZE_HALF;
     for (int j = i; j < size; ++j) {
-        self->fast[fast++] = self->slow[slow++] = pkts[j];
-        uint32_t is_fast = (*((uint32_t*)(pkts[j]->hdr + 14 + 16)) == b) &&
-                           (*((uint32_t*)(pkts[j]->hdr + 14 + 20)) == c) &&
-                           (*((uint32_t*)(pkts[j]->hdr + 14 + 12)) == a);
+        struct packet_t *pkt = pkts[j];
+        char const *hdr = pkt->hdr;
+        self->fast[fast++] = self->slow[slow++] = pkt;
+        uint32_t is_fast = (*((uint32_t*)(hdr + 14 + 16)) ^ b) |
+                           (*((uint32_t*)(hdr + 14 + 12)) ^ a) |
+                           (*((uint32_t*)(hdr + 14 + 20)) ^ c);
 
+        is_fast = (is_fast == 0);
         self->count += is_fast;
         self->port  += (is_fast & self->port);
         fast -= (1 - is_fast);
         slow -= is_fast;
-    }
 
-    for (packet_index_t i = 0; i < fast; ++i) {
-        packet_t *pkt = self->fast[i];
         self->checksum_count += checksum(pkt->hdr, pkt->size);
     }
 

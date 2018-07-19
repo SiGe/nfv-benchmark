@@ -24,6 +24,7 @@ struct merged_fastpass_t {
 
     // A, b, c
     uint32_t a, b, c;
+    uint64_t slowpass_count;
 };
 
 struct merged_fastpass_t *merged_fastpass_create(uint32_t, uint32_t, uint32_t);

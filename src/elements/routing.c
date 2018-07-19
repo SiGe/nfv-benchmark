@@ -218,7 +218,7 @@ void routing_process(struct element_t *el, struct packet_t **pkts, packet_index_
     element_dispatch(el, port_count, pkts, count);
 }
 
-static void routing_release_tbl(struct _routing_tbl_16_t *tbl) {
+void routing_release_tbl(struct _routing_tbl_16_t *tbl) {
     struct _routing_tbl_entry_t *entry = 0;
     for (int i = 0; i < 16; ++i) {
         entry = &tbl->entry[i];

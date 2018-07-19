@@ -23,6 +23,7 @@
 #endif
 
 /* Per element defaults */
+/*
 #ifndef ROUTING_BUFFER_SIZE
 #define ROUTING_BUFFER_SIZE 32
 #endif
@@ -34,6 +35,7 @@
 #ifndef IDENITTY_BUFFER_SIZE
 #define IDENTITY_BUFFER_SIZE 32
 #endif
+*/
 
 #ifndef DROP_BUFFER_SIZE
 #define DROP_BUFFER_SIZE 256
@@ -73,6 +75,12 @@
 #define HIST_SIZE 4096
 #endif
 
-
+/* Packet conditions */
+#define RX_DESC 1024
+#define TX_DESC 1024
+#define MEMPOOL_CACHE_SIZE 256
+#define MAX_PKT_BURST 256
+#define TX_ELE_SIZE 2048
+#define TX_POOL_SIZE (MAX_PKT_BURST * TX_ELE_SIZE)
 
 #endif //_DEFAULTS_H_

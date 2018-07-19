@@ -48,5 +48,6 @@ void routing_report(struct element_t *);
 void routing_entry_add(struct routing_t *, ipv4_prefix_t const *prefix, port_index_t port);
 int routing_file_load(struct routing_t *, char const *);
 struct _routing_tbl_entry_t *routing_entry_find(struct routing_t *, ipv4_t );
+void routing_release_tbl(struct _routing_tbl_16_t *);
 
 #endif // _ELEMENTS_ROUTING_H_

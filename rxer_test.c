@@ -32,9 +32,23 @@ static int console_status = CONSOLE_STOP;
 int  rxer(void *);
 int  datapath_init(int argc, char **, struct dataplane_port_t **);
 void datapath_teardown(struct dataplane_port_t *);
+void release_resources(void);
 
 struct fll_t *g_fll = 0;
 struct rx_packet_stream *g_stream = 0;
+struct pipeline_t *g_pipe = 0;
+
+void release_resources(void) {
+    if (g_pipe) {
+        pipeline_release(g_pipe);
+        g_pipe = 0;
+    }
+
+    if (g_stream) {
+        rx_stream_release(g_stream);
+        g_stream = 0;
+    }
+}
 
 void benchmark_loop(struct dataplane_port_t *port, 
               struct pipeline_t *pipe, 
@@ -99,7 +113,7 @@ void benchmark_loop(struct dataplane_port_t *port,
         packet_send(port, fll_pkt);
         rte_eth_tx_buffer_flush(port->port_id, port->queue_id, port->tx_buffer);
 
-        if (unlikely(record_time == 0 && packet_count > num_packets))
+        if (unlikely(record_time == 1 && packet_count > num_packets))
             break;
     }
 
@@ -142,22 +156,23 @@ int rxer(void *arg) {
     struct rx_packet_stream *stream = 0;
     if (rx_stream_create(LARGEST_BUFFER, rte_eth_dev_socket_id(port_id), &stream) < 0)
         rte_exit(EXIT_FAILURE, "Failed to allocate rx_stream buffer.");
-    struct pipeline_t *pipe = pipeline_build(stream);
+    struct pipeline_t *pipe = g_pipe = pipeline_build(stream);
+    atexit(release_resources);
 
     /* Warm up loop */
     // warmup_loop(port, pipe, stream);
 
     /* Run the benchmark */
     // Warmup loop
-    benchmark_loop(port, pipe, stream, 0, 1<<24);
-    //benchmark_loop(port, pipe, stream, 0, 0);
+    // benchmark_loop(port, pipe, stream, 0, 1<<24);
 
     // Benchmark loop
-    benchmark_loop(port, pipe, stream, 1, 1<<27);
+    benchmark_loop(port, pipe, stream, 0, 1<<26);
 
     /* Clean up whatever junk that remains */
     pipeline_release(pipe);
     rx_stream_release(stream);
+    g_stream = 0; g_pipe = 0;
     struct rte_eth_dev_tx_buffer *buffer = port->tx_buffer;
     rte_free(buffer);
 
