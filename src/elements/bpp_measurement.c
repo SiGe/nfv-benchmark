@@ -42,6 +42,8 @@ void bpp_measurement_process(struct element_t *ele, struct packet_t **pkts, pack
     size_t size_minus_one = self->tbl_size - 1;
     uint32_t tmp[256];
 
+    // XXX: Prefetching the header of the packet also helps with packet
+    // processing speed.
     for (packet_index_t i = 0; i < size; ++i) {
         rte_prefetch0(pkts[i]->hdr);
     }

@@ -49,7 +49,15 @@ void naive_measurement_process(struct element_t *ele, struct packet_t **pkts, pa
     //util_hash(&ip, sizeof(ip), &out);
     out = util_hash_ret(&ip, sizeof(ip));
 
-    // Make sure that the tbl_size is a multiple of two
+    // XXX: AND is much faster than MODULO operator.  Keep the data structure
+    // size in a factor of two and leverage AND to speed up hash table
+    // increment.
+    //
+    // XXX: Measurement data structures typicaly do not need to be "exactly
+    // accurate." We can forgo hash collision checks for this specific
+    // data-structure.  Maybe having "almost" accurate data-structures is an
+    // option?
+    //
     self->tbl[out & size_minus_one]++;
     element_dispatch(ele, 0, pkts, 1);
 }

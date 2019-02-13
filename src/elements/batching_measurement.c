@@ -42,6 +42,13 @@ void batching_measurement_process(struct element_t *ele, struct packet_t **pkts,
     size_t size_minus_one = self->tbl_size - 1;
 
     struct packet_t *pkt = 0;
+    // XXX: Processing multiple packets at the same time speeds up packet
+    // processing greatly.  The reasoning is: First, we can amortize the cost
+    // of function calls: e.g., instead of calling a function multiple times,
+    // we can call it once with many packets.  Second, we increase code
+    // locality so it is less likely to experience INST cache misses.  Third,
+    // because of packet heavy tailed distribution, it is likely for us to end
+    // up with data-cache locality inadvertently.
     for (packet_index_t i = 0; i < size; ++i) {
         char *hdr = pkts[i]->hdr;
         ip.src = *((ipv4_t*)(hdr + 14 + 12));

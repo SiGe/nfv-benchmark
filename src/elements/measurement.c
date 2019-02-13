@@ -52,10 +52,39 @@ void measurement_process_prefetching(struct element_t *ele, struct packet_t **pk
             } ports;
             uint32_t srcdst_port;
         };
+
+        //XXX: There is a major difference in the way that the compiler
+        // compiles the following code (look at the union definition):
+        // IP.ports.src = *(pkt + 12);
+        // IP.ports.dst = *(pkt + 14);
+        //
+        // vs.
+        //
+        // IP.ports.srcdst_port = *(pkt + 12);
+        //
+        // In reality, both of them are doing the same thing (well depending
+        // on the endiness).  But the compiler can generate a much more
+        // efficient code for one implementation vs. another:
+        //
+        // one mov vs. multiple moves + masking.
+        //
     } ip;
 
     uint32_t out;
 
+    // XXX: Help the compiler with unrolling the loops by forcefully processing the
+    // packets in smaller batches of FIXED size.  Normally this would look pretty simple:
+    //
+    // for PKT_BATCH_OF_SIZE_8 in PKTS {
+    //  for PKT in PKT_BATCH_OF_SIZE_8 {
+    //    ...
+    //  }
+    // }
+    //
+    // But considering the note from bp_measurement.c, you prob want to be
+    // processing multiple smaller batches together:  For example, in the case
+    // of measurement module, you may want to prefetch content of packets while
+    // computing the hash (or updating the hash table) in another batch.
     for (int j = 0; j < MM_SIZE_HALF; ++j) {
         p[j] = pkts[j];
         rte_prefetch0(p[j]->hdr + 26);

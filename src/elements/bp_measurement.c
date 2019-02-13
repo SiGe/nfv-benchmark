@@ -42,6 +42,21 @@ void bp_measurement_process(struct element_t *ele, struct packet_t **pkts, packe
     size_t size_minus_one = self->tbl_size - 1;
     uint32_t tmp[256];
 
+    // XXX: Breaking down data-structure pull and update operations can give us
+    // "enough" time to pull the data of the DS into the cache.  In this
+    // specific case (measurement), I have broken down the read and update
+    // operations for updating the hash table.  Note that we are using more
+    // instructions than "{naive,batching}_measurement.c" because we are
+    // iterating over packets twice; however, we have a much better cache
+    // locality because we can prefetch the data into the cache and avoid
+    // bubbles in the instruction pipeline.
+    //
+    // In an ideal world, you would have hoped that the super-scalar
+    // architecture of the CPU handles this at some level.  E.g., the CPU or
+    // the compiler would somehow start processing packets, it would see the
+    // bubble and go to the next packet (if there is no dependencies between
+    // packet operations), i.e., they are not from the same flow.  But this
+    // doesn't happen, and you need to manually do it.
     struct packet_t *pkt = 0;
     for (packet_index_t i = 0; i < size; ++i) {
         char *hdr = pkts[i]->hdr;
