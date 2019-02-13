@@ -1,8 +1,9 @@
 # Module Interface
 
-Each module implements a few function.  The most important one being \_process.
-Module's ``_process`` accepts a batch of packets (read from the NIC) and processes
-them in whatever way that is appropriate.  The interface is as follows:
+Each module implements a few functions (``_create, _process, _release,
+_report``).  The most important one being \_process.  Module's ``_process``
+accepts a batch of packets (read from the NIC) and processes them in whatever
+way that is appropriate.  The interface is as follows:
 
 ``
 *_process(struct element_t *ele, struct packet_t **pkts, packet_index_t size)
